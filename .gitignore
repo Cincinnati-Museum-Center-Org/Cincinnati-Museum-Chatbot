@@ -1,7 +1,7 @@
 # CDK asset staging directory
 .cdk.staging
 cdk.out
-
+PROJECT.md
 # Dependencies
 node_modules
 /.pnp
