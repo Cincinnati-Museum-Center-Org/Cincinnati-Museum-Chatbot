@@ -44,7 +44,7 @@ export class MuseumChatbot extends cdk.Stack {
 
     prefixes.forEach(prefix => {
       new s3deploy.BucketDeployment(this, `Deploy${prefix.replace('/', '')}`, {
-        sources: [s3deploy.Source.data(`${prefix}.placeholder`, ' ')],
+        sources: [s3deploy.Source.data('.placeholder', ' ')],
         destinationBucket: museumDataBucket,
         destinationKeyPrefix: prefix,
       });
@@ -93,7 +93,7 @@ export class MuseumChatbot extends cdk.Stack {
 
     const knowledgeBaseRole = new iam.Role(this, "KnowledgeBaseRole", {
       assumedBy: new iam.ServicePrincipal("bedrock.amazonaws.com"),
-      description: "IAM role for Cincinnati Museum Knowledge Base",
+      description: "IAM role for Museum Knowledge Base",
     });
 
     // Grant permissions to invoke the embedding model
@@ -142,8 +142,8 @@ export class MuseumChatbot extends cdk.Stack {
 
     // Create the Knowledge Base
     const knowledgeBase = new bedrock.CfnKnowledgeBase(this, "MuseumKnowledgeBase", {
-      name: "CincinnatiMuseumKnowledgeBase",
-      description: "Knowledge base for Cincinnati Museum containing exhibit information, artwork details, and visitor guides",
+      name: "MuseumKnowledgeBase",
+      description: "Knowledge base for Museum containing exhibit information, artwork details, and visitor guides",
       roleArn: knowledgeBaseRole.roleArn,
       knowledgeBaseConfiguration: {
         type: "VECTOR",
@@ -220,6 +220,63 @@ export class MuseumChatbot extends cdk.Stack {
     dataSource.addDependency(knowledgeBase);
 
     // ========================================
+    // Web Crawler Data Source for Museum Websites
+    // ========================================
+    // NOTE: Web crawler data sources are currently only supported with 
+    // Amazon OpenSearch Serverless vector databases, not S3 Vectors.
+    // Uncomment this section when S3 Vectors supports WEB data sources.
+    
+    // // - Main website: cincymuseum.org
+    // // - Collections: searchcollections.cincymuseum.org
+    // // - Philanthropy: supportcmc.org
+    // const webCrawlerDataSource = new bedrock.CfnDataSource(this, "MuseumWebCrawlerDataSource", {
+    //   name: "MuseumWebsites",
+    //   description: "Web crawler for Museum websites including main site, collections, and philanthropy",
+    //   knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
+    //   dataSourceConfiguration: {
+    //     type: "WEB",
+    //     webConfiguration: {
+    //       sourceConfiguration: {
+    //         urlConfiguration: {
+    //           seedUrls: [
+    //             { url: "https://cincymuseum.org" },
+    //             { url: "https://searchcollections.cincymuseum.org" },
+    //             { url: "https://supportcmc.org" },
+    //           ],
+    //         },
+    //       },
+    //       crawlerConfiguration: {
+    //         crawlerLimits: {
+    //           maxPages: 300, // Limit pages per seed URL to control costs
+    //           rateLimit: 20, // Requests per minute to be respectful to servers
+    //         },
+    //         // scope not specified = Default (same host + same initial URL path)
+    //         // Exclude non-content pages
+    //         exclusionFilters: [
+    //           ".*\\.(jpg|jpeg|png|gif|svg|pdf|zip|exe)$", // Binary files
+    //           ".*/login.*",
+    //           ".*/admin.*",
+    //           ".*/cart.*",
+    //           ".*/checkout.*",
+    //         ],
+    //       },
+    //     },
+    //   },
+    //   vectorIngestionConfiguration: {
+    //     chunkingConfiguration: {
+    //       chunkingStrategy: "FIXED_SIZE",
+    //       fixedSizeChunkingConfiguration: {
+    //         maxTokens: 500,
+    //         overlapPercentage: 20,
+    //       },
+    //     },
+    //   },
+    // });
+
+    // // Ensure web crawler data source is created after knowledge base
+    // webCrawlerDataSource.addDependency(knowledgeBase);
+
+    // ========================================
     // Outputs
     // ========================================
 
@@ -250,7 +307,13 @@ export class MuseumChatbot extends cdk.Stack {
 
     new cdk.CfnOutput(this, "DataSourceId", {
       value: dataSource.attrDataSourceId,
-      description: "Data Source ID for the Knowledge Base",
+      description: "Data Source ID for S3 documents",
     });
+
+    // Uncomment when web crawler data source is enabled
+    // new cdk.CfnOutput(this, "WebCrawlerDataSourceId", {
+    //   value: webCrawlerDataSource.attrDataSourceId,
+    //   description: "Data Source ID for web crawler (Museum websites)",
+    // });
   }
 }
