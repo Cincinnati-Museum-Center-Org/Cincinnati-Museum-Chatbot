@@ -1,0 +1,53 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Typewriter Exchange - 4th and Plum"
+      },
+      "includeForEmbedding": true
+    },
+    "image_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "SC#296-274"
+      },
+      "includeForEmbedding": true
+    },
+    "collection": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Rombach & Groene Collection"
+      },
+      "includeForEmbedding": true
+    },
+    "dates": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "08/01/1908"
+      },
+      "includeForEmbedding": true
+    },
+    "subjects": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Buildings -- Ohio -- Cincinnati"
+      },
+      "includeForEmbedding": true
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Photograph"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center"
+      },
+      "includeForEmbedding": false
+    }
+  }
+}

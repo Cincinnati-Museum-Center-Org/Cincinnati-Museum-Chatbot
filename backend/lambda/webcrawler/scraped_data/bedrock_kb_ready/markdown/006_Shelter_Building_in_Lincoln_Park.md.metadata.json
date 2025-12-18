@@ -1,0 +1,53 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Shelter Building in Lincoln Park"
+      },
+      "includeForEmbedding": true
+    },
+    "image_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "SC#319-028"
+      },
+      "includeForEmbedding": true
+    },
+    "collection": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "CUT Progress Photographs Collection"
+      },
+      "includeForEmbedding": true
+    },
+    "dates": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "05/05/1931"
+      },
+      "includeForEmbedding": true
+    },
+    "subjects": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Parks -- Ohio -- Cincinnati"
+      },
+      "includeForEmbedding": true
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Photograph"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center"
+      },
+      "includeForEmbedding": false
+    }
+  }
+}

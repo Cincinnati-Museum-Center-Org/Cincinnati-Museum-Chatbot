@@ -1,0 +1,43 @@
+{
+  "metadataAttributes": {
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Photograph Collection"
+      },
+      "includeForEmbedding": false
+    }
+  },
+  "documentStructureConfiguration": {
+    "type": "RECORD_BASED_STRUCTURE_METADATA",
+    "recordBasedStructureMetadata": {
+      "contentFields": [
+        {
+          "fieldName": "description"
+        }
+      ],
+      "metadataFieldsSpecification": {
+        "fieldsToInclude": [
+          {
+            "fieldName": "title"
+          },
+          {
+            "fieldName": "image_id"
+          },
+          {
+            "fieldName": "collection"
+          },
+          {
+            "fieldName": "dates"
+          },
+          {
+            "fieldName": "subjects"
+          },
+          {
+            "fieldName": "media_type"
+          }
+        ]
+      }
+    }
+  }
+}

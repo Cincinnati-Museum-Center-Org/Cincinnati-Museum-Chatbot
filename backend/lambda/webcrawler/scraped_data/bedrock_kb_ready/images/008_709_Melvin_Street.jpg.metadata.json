@@ -1,0 +1,53 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "709 Melvin Street"
+      },
+      "includeForEmbedding": true
+    },
+    "image_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "SC#115-1304"
+      },
+      "includeForEmbedding": true
+    },
+    "collection": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Kenyon Barr Collection"
+      },
+      "includeForEmbedding": true
+    },
+    "dates": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "07/14/1959"
+      },
+      "includeForEmbedding": true
+    },
+    "subjects": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Housing -- Ohio -- Cincinnati"
+      },
+      "includeForEmbedding": true
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Photograph"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center"
+      },
+      "includeForEmbedding": false
+    }
+  }
+}

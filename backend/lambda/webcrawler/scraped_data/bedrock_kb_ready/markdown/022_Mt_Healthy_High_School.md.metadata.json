@@ -1,0 +1,53 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Mt. Healthy High School"
+      },
+      "includeForEmbedding": true
+    },
+    "image_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "SC#150-388"
+      },
+      "includeForEmbedding": true
+    },
+    "collection": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Samuel Hannaford & Sons Collection"
+      },
+      "includeForEmbedding": true
+    },
+    "dates": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "c. 1930"
+      },
+      "includeForEmbedding": true
+    },
+    "subjects": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Architecture -- Ohio -- Mt. Healthy"
+      },
+      "includeForEmbedding": true
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Photograph"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center"
+      },
+      "includeForEmbedding": false
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Turntable, Cincinnati Union Terminal Yards"
+      },
+      "includeForEmbedding": true
+    },
+    "image_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "SC#296-4133G"
+      },
+      "includeForEmbedding": true
+    },
+    "collection": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Rombach & Groene Collection"
+      },
+      "includeForEmbedding": true
+    },
+    "dates": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "12/24/1948"
+      },
+      "includeForEmbedding": true
+    },
+    "subjects": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Union Terminal (Cincinnati, Ohio)"
+      },
+      "includeForEmbedding": true
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Photograph"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center"
+      },
+      "includeForEmbedding": false
+    }
+  }
+}
