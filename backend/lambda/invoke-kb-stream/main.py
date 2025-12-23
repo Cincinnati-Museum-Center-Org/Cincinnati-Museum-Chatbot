@@ -11,8 +11,18 @@ import json
 import boto3
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+# Add CORS middleware to handle cross-origin requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize Bedrock Agent Runtime client
 bedrock_agent_runtime = boto3.client("bedrock-agent-runtime")
