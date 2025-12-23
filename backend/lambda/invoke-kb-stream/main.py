@@ -21,8 +21,7 @@ bedrock_agent_runtime = boto3.client("bedrock-agent-runtime")
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID")
 
 # Model ID for generation - using global inference profile
-MODEL_ID = "global.amazon.nova-lite-v1:0"
-
+MODEL_ID = "global.amazon.nova-2-lite-v1:0"
 
 async def stream_kb_response(query: str, session_id: str = None, number_of_results: int = 5):
     """

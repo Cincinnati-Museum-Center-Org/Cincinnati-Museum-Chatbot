@@ -7,6 +7,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as bedrock from "aws-cdk-lib/aws-bedrock";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as os from "os";
 import {
   opensearchserverless,
@@ -67,6 +68,29 @@ export class MuseumChatbot extends cdk.Stack {
       enforceSSL: true,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+    });
+
+    // ========================================
+    // DynamoDB Table: User Information
+    // ========================================
+
+    // Table to collect and store user information from chatbot interactions
+    const userTable = new dynamodb.Table(this, "UserTable", {
+      tableName: `MuseumChatbot-Users-${Date.now()}`,
+      partitionKey: {
+        name: "userId",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "createdAt",
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, // On-demand pricing for cost efficiency
+      removalPolicy: cdk.RemovalPolicy.RETAIN, // Retain user data on stack deletion
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true, // Enable point-in-time recovery for data protection
+      },
+      encryption: dynamodb.TableEncryption.AWS_MANAGED, // Server-side encryption
     });
 
     // ========================================
@@ -524,6 +548,16 @@ export class MuseumChatbot extends cdk.Stack {
     new cdk.CfnOutput(this, "ChatApiUrl", {
       value: `${api.url}chat`,
       description: "API Gateway URL for streaming chat endpoint (POST /chat)",
+    });
+
+    new cdk.CfnOutput(this, "UserTableName", {
+      value: userTable.tableName,
+      description: "DynamoDB table for storing user information",
+    });
+
+    new cdk.CfnOutput(this, "UserTableArn", {
+      value: userTable.tableArn,
+      description: "DynamoDB table ARN for user information",
     });
   }
 }
