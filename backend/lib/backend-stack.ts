@@ -5,6 +5,8 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as bedrock from "aws-cdk-lib/aws-bedrock";
+import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as os from "os";
 import {
   opensearchserverless,
@@ -52,14 +54,8 @@ export class MuseumChatbot extends cdk.Stack {
       });
     });
 
-    // Deploy scraped CMC photographs with metadata to the public folder
-    // These images have companion .metadata.json files for Bedrock KB filtering
-    new s3deploy.BucketDeployment(this, "DeployCMCPhotographs", {
-      sources: [s3deploy.Source.asset("./lambda/webcrawler/scraped_data/bedrock_kb_ready/images")],
-      destinationBucket: museumDataBucket,
-      destinationKeyPrefix: "public/cmc-photographs/",
-      prune: false, // Don't delete existing files
-    });
+    // CMC photographs are uploaded separately via AWS CLI to avoid redeployment on every cdk deploy:
+    // aws s3 sync ./lambda/webcrawler/scraped_data/bedrock_kb_ready/images s3://<bucket-name>/public/cmc-photographs/
 
     // ========================================
     // Supplemental Data Storage (for multimodal embeddings)
@@ -210,7 +206,7 @@ export class MuseumChatbot extends cdk.Stack {
     // ========================================
 
     const dataSource = new bedrock.CfnDataSource(this, "MuseumDataSource", {
-      name: `MuseumDocuments-${Date.now()}`,
+      name: "MuseumDocuments-v2",
       description: "Museum documents including exhibit guides, artwork information, and visitor resources",
       knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
       dataSourceConfiguration: {
@@ -248,7 +244,7 @@ export class MuseumChatbot extends cdk.Stack {
     // - Collections: searchcollections.cincymuseum.org
     // - Philanthropy: supportcmc.org
     const webCrawlerDataSource = new bedrock.CfnDataSource(this, "MuseumWebCrawlerDataSource", {
-      name: `MuseumWebsites-${Date.now()}`,
+      name: "MuseumWebsites-v2",
       description: "Web crawler for Museum websites including main site, collections, and philanthropy",
       knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
       dataSourceConfiguration: {
@@ -294,6 +290,179 @@ export class MuseumChatbot extends cdk.Stack {
     webCrawlerDataSource.addDependency(knowledgeBase);
 
     // ========================================
+    // Lambda Function: Invoke Knowledge Base
+    // ========================================
+
+    // Create IAM role for the Lambda function
+    const invokeKbLambdaRole = new iam.Role(this, "InvokeKbLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      description: "IAM role for Knowledge Base invocation Lambda",
+      managedPolicies: [
+        iam.ManagedPolicy.fromManagedPolicyArn(
+          this,
+          "LambdaBasicExecution",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ),
+      ],
+    });
+
+    // Grant permissions to invoke Bedrock Knowledge Base
+    invokeKbLambdaRole.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "bedrock:RetrieveAndGenerate",
+          "bedrock:Retrieve",
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock:GetInferenceProfile",
+        ],
+        resources: ["*"],
+      })
+    );
+
+    // Lambda function to invoke Knowledge Base with Retrieve and Generate API
+    const invokeKbLambda = new lambda.Function(this, "InvokeKbLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambdaArchitecture,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset("lambda/invoke-kb"),
+      role: invokeKbLambdaRole,
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 512,
+      environment: {
+        KNOWLEDGE_BASE_ID: knowledgeBase.attrKnowledgeBaseId,
+      },
+      description: "Invokes Bedrock Knowledge Base with Retrieve and Generate API for multimodal responses",
+    });
+
+    // Ensure Lambda is created after Knowledge Base
+    invokeKbLambda.node.addDependency(knowledgeBase);
+
+    // ========================================
+    // Streaming Lambda Function with Lambda Web Adapter
+    // ========================================
+    // Uses Lambda Web Adapter Layer for Python response streaming
+    // Reference: https://github.com/aws-samples/serverless-samples/tree/main/apigw-response-streaming/python-strands-lambda
+
+    // Lambda Web Adapter Layer ARN (managed by AWS)
+    // See: https://github.com/awslabs/aws-lambda-web-adapter
+    const lambdaWebAdapterLayerArn = lambdaArchitecture === lambda.Architecture.ARM_64
+      ? `arn:aws:lambda:${aws_region}:753240598075:layer:LambdaAdapterLayerArm64:25`
+      : `arn:aws:lambda:${aws_region}:753240598075:layer:LambdaAdapterLayerX86:25`;
+
+    // Streaming Lambda function with FastAPI and Lambda Web Adapter
+    const invokeKbStreamLambda = new lambda.Function(this, "InvokeKbStreamLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambdaArchitecture,
+      handler: "run.sh",
+      code: lambda.Code.fromAsset("lambda/invoke-kb-stream", {
+        bundling: {
+          image: lambda.Runtime.PYTHON_3_13.bundlingImage,
+          command: [
+            "bash", "-c",
+            "pip install -r requirements.txt -t /asset-output && cp -au . /asset-output"
+          ],
+        },
+      }),
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 512,
+      environment: {
+        KNOWLEDGE_BASE_ID: knowledgeBase.attrKnowledgeBaseId,
+        AWS_LAMBDA_EXEC_WRAPPER: "/opt/bootstrap",
+        AWS_LWA_INVOKE_MODE: "response_stream",
+        PORT: "8000",
+      },
+      layers: [
+        lambda.LayerVersion.fromLayerVersionArn(this, "LambdaWebAdapterLayer", lambdaWebAdapterLayerArn),
+      ],
+      description: "Streaming Lambda with FastAPI for Bedrock KB (uses Lambda Web Adapter)",
+    });
+
+    // Grant permissions to invoke Bedrock Knowledge Base
+    invokeKbStreamLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "bedrock:RetrieveAndGenerate",
+          "bedrock:Retrieve",
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+          "bedrock:GetInferenceProfile",
+        ],
+        resources: ["*"],
+      })
+    );
+
+    // Ensure Lambda is created after Knowledge Base
+    invokeKbStreamLambda.node.addDependency(knowledgeBase);
+
+    // ========================================
+    // REST API Gateway with Response Streaming
+    // ========================================
+
+    // IAM Role for API Gateway to write to CloudWatch Logs
+    const apiGatewayCloudWatchRole = new iam.Role(this, "ApiGatewayCloudWatchRole", {
+      assumedBy: new iam.ServicePrincipal("apigateway.amazonaws.com"),
+      managedPolicies: [
+        iam.ManagedPolicy.fromManagedPolicyArn(
+          this,
+          "ApiGatewayPushToCloudWatch",
+          "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+        ),
+      ],
+    });
+
+    // API Gateway Account Configuration (required for CloudWatch logging)
+    const apiGatewayAccount = new apigateway.CfnAccount(this, "ApiGatewayAccount", {
+      cloudWatchRoleArn: apiGatewayCloudWatchRole.roleArn,
+    });
+
+    // CloudWatch Log Group for API Gateway Access Logs
+    const apiAccessLogs = new logs.LogGroup(this, "ApiGatewayAccessLogs", {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // REST API with response streaming support
+    const api = new apigateway.RestApi(this, "MuseumChatbotApi", {
+      restApiName: "Museum Chatbot API",
+      description: "REST API for Museum Chatbot with response streaming support",
+      deployOptions: {
+        stageName: "prod",
+        accessLogDestination: new apigateway.LogGroupLogDestination(apiAccessLogs),
+        accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields(),
+      },
+      defaultCorsPreflightOptions: {
+        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: [
+          "Content-Type",
+          "X-Amz-Date",
+          "Authorization",
+          "X-Api-Key",
+          "X-Amz-Security-Token",
+        ],
+      },
+    });
+
+    // Ensure API is created after the account configuration
+    api.node.addDependency(apiGatewayAccount);
+
+    // Create /chat resource
+    const chatResource = api.root.addResource("chat");
+
+    // Lambda integration with response streaming enabled
+    // Uses ResponseTransferMode.STREAM for streaming responses
+    const streamingIntegration = new apigateway.LambdaIntegration(invokeKbStreamLambda, {
+      proxy: true,
+      responseTransferMode: apigateway.ResponseTransferMode.STREAM,
+    });
+
+    // POST /chat - Streaming chat endpoint
+    chatResource.addMethod("POST", streamingIntegration);
+
+    // ========================================
     // Outputs
     // ========================================
 
@@ -335,6 +504,26 @@ export class MuseumChatbot extends cdk.Stack {
     new cdk.CfnOutput(this, "WebCrawlerDataSourceId", {
       value: webCrawlerDataSource.attrDataSourceId,
       description: "Data Source ID for web crawler (Museum websites)",
+    });
+
+    new cdk.CfnOutput(this, "InvokeKbLambdaArn", {
+      value: invokeKbLambda.functionArn,
+      description: "Lambda function ARN for invoking Knowledge Base",
+    });
+
+    new cdk.CfnOutput(this, "InvokeKbLambdaName", {
+      value: invokeKbLambda.functionName,
+      description: "Lambda function name for invoking Knowledge Base",
+    });
+
+    new cdk.CfnOutput(this, "StreamingLambdaArn", {
+      value: invokeKbStreamLambda.functionArn,
+      description: "Streaming Lambda function ARN",
+    });
+
+    new cdk.CfnOutput(this, "ChatApiUrl", {
+      value: `${api.url}chat`,
+      description: "API Gateway URL for streaming chat endpoint (POST /chat)",
     });
   }
 }
