@@ -4,16 +4,10 @@ import { useState, useRef, useEffect, FormEvent, useMemo } from 'react';
 import { useLanguage } from './context/LanguageContext';
 import { getApiConfig } from './config/i18n';
 import Image from 'next/image';
+import { MapPin, Clock, Ticket, BookOpen, Users, Heart, Send } from 'lucide-react';
 
 // Import modular components
 import {
-  LocationIcon,
-  ClockIcon,
-  TicketIcon,
-  BookIcon,
-  GroupIcon,
-  HeartIcon,
-  SendIcon,
   MarkdownContent,
   CitationsDisplay,
   type Message,
@@ -186,14 +180,14 @@ export default function Home() {
     }
   };
 
-  // Quick action buttons config
+  // Quick action buttons config with Lucide icons
   const quickActions = [
-    { key: 'planYourVisit', icon: <LocationIcon />, primary: true },
-    { key: 'currentExhibits', icon: <ClockIcon />, primary: true },
-    { key: 'ticketsMembership', icon: <TicketIcon />, primary: true },
-    { key: 'collections', icon: <BookIcon />, primary: false },
-    { key: 'groupVisits', icon: <GroupIcon />, primary: false },
-    { key: 'supportMuseum', icon: <HeartIcon />, primary: false },
+    { key: 'planYourVisit', icon: <MapPin size={20} />, primary: true },
+    { key: 'currentExhibits', icon: <Clock size={20} />, primary: true },
+    { key: 'ticketsMembership', icon: <Ticket size={20} />, primary: true },
+    { key: 'collections', icon: <BookOpen size={20} />, primary: false },
+    { key: 'groupVisits', icon: <Users size={20} />, primary: false },
+    { key: 'supportMuseum', icon: <Heart size={20} />, primary: false },
   ];
 
   const hasMessages = messages.length > 0;
@@ -245,7 +239,7 @@ export default function Home() {
 
       {/* Main Chat Area */}
       <main className="flex-1 min-h-0 overflow-y-auto px-4 py-6">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {/* Welcome Card */}
           {!hasMessages && (
             <div className="animate-fade-in">
@@ -344,7 +338,7 @@ export default function Home() {
 
       {/* Input Bar */}
       <div className="shrink-0 border-t border-[var(--border-light)] bg-white px-4 py-4">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <form onSubmit={handleSubmit} className="flex items-center gap-3">
             <input
               ref={inputRef}
@@ -362,7 +356,7 @@ export default function Home() {
               className="flex items-center justify-center w-12 h-12 bg-[var(--primary-blue)] text-white rounded-full hover:bg-[var(--primary-blue-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label={t.sendMessage}
             >
-              <SendIcon />
+              <Send size={20} />
             </button>
           </form>
         </div>

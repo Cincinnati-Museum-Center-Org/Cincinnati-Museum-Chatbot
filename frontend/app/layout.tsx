@@ -1,12 +1,22 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Montserrat, Open_Sans } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "./context/LanguageContext";
 
-const inter = Inter({
-  variable: "--font-inter",
+// Primary font - Montserrat (used by CMC website for headings)
+const montserrat = Montserrat({
+  variable: "--font-montserrat",
   subsets: ["latin"],
   display: "swap",
+  weight: ["400", "500", "600", "700"],
+});
+
+// Secondary font - Open Sans (used by CMC website for body text)
+const openSans = Open_Sans({
+  variable: "--font-open-sans",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -33,7 +43,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} antialiased`} suppressHydrationWarning>
+      <body className={`${montserrat.variable} ${openSans.variable} antialiased`} suppressHydrationWarning>
         <LanguageProvider>
           {children}
         </LanguageProvider>

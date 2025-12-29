@@ -31,6 +31,7 @@ export interface MediaSource {
   subjects?: string;
   description?: string;
   source?: string;
+  contentType?: string;
   mediaUrl: string;
   mediaType: 'image' | 'video' | 'document';
 }
