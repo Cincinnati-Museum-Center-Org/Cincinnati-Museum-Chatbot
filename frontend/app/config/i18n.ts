@@ -130,6 +130,13 @@ export const quickActionPrompts: Record<Language, Record<string, string>> = {
 };
 
 // API configuration - uses environment variable
-export const getApiConfig = () => ({
-  chatEndpoint: process.env.NEXT_PUBLIC_CHAT_API_URL || '',
-});
+export const getApiConfig = () => {
+  const baseUrl = process.env.NEXT_PUBLIC_CHAT_API_URL || '';
+  // Derive feedback URL from chat URL (same API, different endpoint)
+  const feedbackEndpoint = baseUrl ? baseUrl.replace('/chat', '/feedback') : '';
+  
+  return {
+    chatEndpoint: baseUrl,
+    feedbackEndpoint: feedbackEndpoint,
+  };
+};

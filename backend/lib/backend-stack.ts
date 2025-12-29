@@ -8,6 +8,7 @@ import * as bedrock from "aws-cdk-lib/aws-bedrock";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as os from "os";
 import {
   opensearchserverless,
@@ -118,6 +119,84 @@ export class MuseumChatbot extends cdk.Stack {
         pointInTimeRecoveryEnabled: true, // Enable point-in-time recovery for data protection
       },
       encryption: dynamodb.TableEncryption.AWS_MANAGED, // Server-side encryption
+    });
+
+    // ========================================
+    // DynamoDB Table: Conversation History
+    // ========================================
+
+    // Table to store conversation history for analytics and admin dashboard
+    // Schema:
+    // - conversationId (PK): Unique ID for each Q&A pair
+    // - sessionId (SK): Session ID for grouping conversations
+    // - timestamp: ISO timestamp of the conversation
+    // - question: User's question
+    // - answer: Bot's response
+    // - citations: JSON array of citations returned
+    // - feedback: 'positive' | 'negative' | null
+    // - feedbackTimestamp: When feedback was submitted
+    // - responseTimeMs: Time taken to generate response
+    // - modelId: Model used for generation
+    // - knowledgeBaseId: KB used
+    // - language: User's language preference
+    const conversationHistoryTable = new dynamodb.Table(this, "ConversationHistoryTable", {
+      tableName: `MuseumChatbot-ConversationHistory`,
+      partitionKey: {
+        name: "conversationId",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "timestamp",
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      pointInTimeRecoverySpecification: {
+        pointInTimeRecoveryEnabled: true,
+      },
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+    });
+
+    // GSI for querying by sessionId (to get all conversations in a session)
+    conversationHistoryTable.addGlobalSecondaryIndex({
+      indexName: "sessionId-timestamp-index",
+      partitionKey: {
+        name: "sessionId",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "timestamp",
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI for querying by date (for admin dashboard analytics)
+    conversationHistoryTable.addGlobalSecondaryIndex({
+      indexName: "date-timestamp-index",
+      partitionKey: {
+        name: "date",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "timestamp",
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // GSI for querying by feedback status (for reviewing positive/negative responses)
+    conversationHistoryTable.addGlobalSecondaryIndex({
+      indexName: "feedback-timestamp-index",
+      partitionKey: {
+        name: "feedback",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "timestamp",
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
     });
 
     // ========================================
@@ -423,6 +502,7 @@ export class MuseumChatbot extends cdk.Stack {
         AWS_LAMBDA_EXEC_WRAPPER: "/opt/bootstrap",
         AWS_LWA_INVOKE_MODE: "response_stream",
         PORT: "8000",
+        CONVERSATION_HISTORY_TABLE: conversationHistoryTable.tableName,
       },
       layers: [
         lambda.LayerVersion.fromLayerVersionArn(this, "LambdaWebAdapterLayer", lambdaWebAdapterLayerArn),
@@ -444,6 +524,9 @@ export class MuseumChatbot extends cdk.Stack {
         resources: ["*"],
       })
     );
+
+    // Grant DynamoDB permissions for conversation history
+    conversationHistoryTable.grantReadWriteData(invokeKbStreamLambda);
 
     // Ensure Lambda is created after Knowledge Base
     invokeKbStreamLambda.node.addDependency(knowledgeBase);
@@ -506,6 +589,122 @@ export class MuseumChatbot extends cdk.Stack {
 
     // POST /chat - Streaming chat endpoint
     chatResource.addMethod("POST", streamingIntegration);
+
+    // Create /feedback resource for submitting conversation feedback
+    const feedbackResource = api.root.addResource("feedback");
+
+    // Standard Lambda integration (no streaming needed for feedback)
+    const feedbackIntegration = new apigateway.LambdaIntegration(invokeKbStreamLambda, {
+      proxy: true,
+    });
+
+    // POST /feedback - Submit feedback for a conversation
+    feedbackResource.addMethod("POST", feedbackIntegration);
+
+    // ========================================
+    // Cognito User Pool for Admin Authentication
+    // ========================================
+
+    const adminUserPool = new cognito.UserPool(this, "AdminUserPoolV2", {
+      userPoolName: "MuseumChatbot-AdminPool",
+      selfSignUpEnabled: false, // Only admins can create users
+      signInAliases: {
+        email: true, // Use email as the sign-in identifier
+      },
+      autoVerify: {
+        email: true,
+      },
+      standardAttributes: {
+        email: {
+          required: true,
+          mutable: true,
+        },
+      },
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: false,
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    // App client for the admin dashboard
+    const adminAppClient = adminUserPool.addClient("AdminAppClient", {
+      authFlows: {
+        userPassword: true,
+        userSrp: true,
+      },
+      generateSecret: false, // For browser-based apps
+      preventUserExistenceErrors: true,
+    });
+
+    // ========================================
+    // Admin API Lambda Function
+    // ========================================
+
+    const adminApiLambda = new lambda.Function(this, "AdminApiLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambdaArchitecture,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset("lambda/admin-api"),
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: {
+        CONVERSATION_HISTORY_TABLE: conversationHistoryTable.tableName,
+      },
+      description: "Admin API for dashboard analytics and conversation management",
+    });
+
+    // Grant read access to conversation history table
+    conversationHistoryTable.grantReadData(adminApiLambda);
+
+    // ========================================
+    // Admin API Gateway (Cognito Authorized)
+    // ========================================
+
+    // Cognito authorizer for admin API
+    const adminAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, "AdminAuthorizer", {
+      cognitoUserPools: [adminUserPool],
+    });
+
+    // Create /admin resource on the existing API
+    const adminResource = api.root.addResource("admin");
+
+    // Admin Lambda integration
+    const adminIntegration = new apigateway.LambdaIntegration(adminApiLambda, {
+      proxy: true,
+    });
+
+    // GET /admin/stats - Get dashboard statistics (protected)
+    const statsResource = adminResource.addResource("stats");
+    statsResource.addMethod("GET", adminIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+
+    // GET /admin/conversations - Get conversation list (protected)
+    const conversationsResource = adminResource.addResource("conversations");
+    conversationsResource.addMethod("GET", adminIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+
+    // GET /admin/conversations/{id} - Get single conversation (protected)
+    const conversationByIdResource = conversationsResource.addResource("{conversationId}");
+    conversationByIdResource.addMethod("GET", adminIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+
+    // GET /admin/feedback - Get feedback summary (protected)
+    const feedbackSummaryResource = adminResource.addResource("feedback-summary");
+    feedbackSummaryResource.addMethod("GET", adminIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
 
     // ========================================
     // Outputs
@@ -571,6 +770,11 @@ export class MuseumChatbot extends cdk.Stack {
       description: "API Gateway URL for streaming chat endpoint (POST /chat)",
     });
 
+    new cdk.CfnOutput(this, "FeedbackApiUrl", {
+      value: `${api.url}feedback`,
+      description: "API Gateway URL for feedback endpoint (POST /feedback)",
+    });
+
     new cdk.CfnOutput(this, "UserTableName", {
       value: userTable.tableName,
       description: "DynamoDB table for storing user information",
@@ -579,6 +783,32 @@ export class MuseumChatbot extends cdk.Stack {
     new cdk.CfnOutput(this, "UserTableArn", {
       value: userTable.tableArn,
       description: "DynamoDB table ARN for user information",
+    });
+
+    new cdk.CfnOutput(this, "ConversationHistoryTableName", {
+      value: conversationHistoryTable.tableName,
+      description: "DynamoDB table for storing conversation history and analytics",
+    });
+
+    new cdk.CfnOutput(this, "ConversationHistoryTableArn", {
+      value: conversationHistoryTable.tableArn,
+      description: "DynamoDB table ARN for conversation history",
+    });
+
+    // Admin Dashboard Outputs
+    new cdk.CfnOutput(this, "AdminUserPoolId", {
+      value: adminUserPool.userPoolId,
+      description: "Cognito User Pool ID for admin authentication",
+    });
+
+    new cdk.CfnOutput(this, "AdminUserPoolClientId", {
+      value: adminAppClient.userPoolClientId,
+      description: "Cognito App Client ID for admin dashboard",
+    });
+
+    new cdk.CfnOutput(this, "AdminApiUrl", {
+      value: `${api.url}admin`,
+      description: "API Gateway URL for admin endpoints (requires Cognito auth)",
     });
 
     // Public URL base for accessing images in the public/ prefix

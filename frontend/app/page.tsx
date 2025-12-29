@@ -19,7 +19,12 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string>(() => {
+    // Generate a unique session ID on component mount
+    const id = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    console.log('🔵 New session initialized:', id);
+    return id;
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -65,6 +70,7 @@ export default function Home() {
     setMessages(prev => [...prev, assistantMessage]);
 
     try {
+      console.log('🔵 Sending request with sessionId:', sessionId);
       const response = await fetch(apiConfig.chatEndpoint, {
         method: 'POST',
         headers: {
@@ -87,6 +93,7 @@ export default function Home() {
       const decoder = new TextDecoder();
       let accumulatedText = '';
       let accumulatedCitations: Citation[] = [];
+      let conversationId: string | undefined;
 
       if (reader) {
         while (true) {
@@ -105,7 +112,20 @@ export default function Home() {
               try {
                 const parsed = JSON.parse(data);
                 
+                // Capture conversationId for feedback tracking
+                if (parsed.conversationId) {
+                  conversationId = parsed.conversationId;
+                  setMessages(prev =>
+                    prev.map(msg =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, conversationId: conversationId }
+                        : msg
+                    )
+                  );
+                }
+                
                 if (parsed.sessionId) {
+                  console.log('🟢 Received sessionId from backend:', parsed.sessionId);
                   setSessionId(parsed.sessionId);
                 }
                 
@@ -323,7 +343,10 @@ export default function Home() {
                           className="chat-content"
                         />
                         {message.citations && message.citations.length > 0 && !message.isStreaming && (
-                          <CitationsDisplay citations={message.citations} />
+                          <CitationsDisplay 
+                            citations={message.citations} 
+                            conversationId={message.conversationId}
+                          />
                         )}
                       </>
                     )}
@@ -345,9 +368,8 @@ export default function Home() {
               type="text"
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
-              placeholder={t.inputPlaceholder}
-              disabled={isLoading}
-              className="chat-input flex-1 px-4 py-3 bg-[var(--background)] border border-[var(--border-light)] rounded-full text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-[var(--primary-blue)] transition-colors disabled:opacity-50"
+              placeholder={isLoading ? t.inputPlaceholder : t.inputPlaceholder}
+              className="chat-input flex-1 px-4 py-3 bg-[var(--background)] border border-[var(--border-light)] rounded-full text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:border-[var(--primary-blue)] transition-colors"
               aria-label={t.newMessage}
             />
             <button

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Montserrat, Open_Sans } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "./context/LanguageContext";
+import { AdminAuthProvider } from "./context/AdminAuthContext";
 
 // Primary font - Montserrat (used by CMC website for headings)
 const montserrat = Montserrat({
@@ -44,9 +45,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${montserrat.variable} ${openSans.variable} antialiased`} suppressHydrationWarning>
-        <LanguageProvider>
-          {children}
-        </LanguageProvider>
+        <AdminAuthProvider>
+          <LanguageProvider>
+            {children}
+          </LanguageProvider>
+        </AdminAuthProvider>
       </body>
     </html>
   );

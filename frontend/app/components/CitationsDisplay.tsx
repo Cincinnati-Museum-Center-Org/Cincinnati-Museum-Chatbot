@@ -13,25 +13,29 @@ import {
   ThumbsUp,
   ThumbsDown,
   Check,
+  FileText,
+  Globe,
 } from 'lucide-react';
 import type { Citation, MediaSource, WebSource } from './types';
+import { getApiConfig } from '../config/i18n';
 
 interface CitationsDisplayProps {
   citations: Citation[];
+  conversationId?: string; // For feedback tracking
 }
 
 /**
  * Component to display citations with media (images, videos) and web links
  * Note: Backend filters citations to only include public S3 content and converts URIs to HTTPS URLs
  */
-export function CitationsDisplay({ citations }: CitationsDisplayProps) {
+export function CitationsDisplay({ citations, conversationId }: CitationsDisplayProps) {
   const [selectedMedia, setSelectedMedia] = useState<MediaSource | null>(null);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [showCheck, setShowCheck] = useState(false);
   const [isFading, setIsFading] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
 
-  const handleFeedback = (type: 'up' | 'down') => {
+  const handleFeedback = async (type: 'up' | 'down') => {
     if (feedback) return;
     
     setFeedback(type);
@@ -50,11 +54,35 @@ export function CitationsDisplay({ citations }: CitationsDisplayProps) {
     setTimeout(() => {
       setIsHidden(true);
     }, 3000);
+
+    // Send feedback to API if conversationId is available
+    if (conversationId) {
+      try {
+        const apiConfig = getApiConfig();
+        if (apiConfig.feedbackEndpoint) {
+          await fetch(apiConfig.feedbackEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              conversationId: conversationId,
+              feedback: type === 'up' ? 'pos' : 'neg',
+            }),
+          });
+          console.log(`Feedback submitted: ${type} for conversation ${conversationId}`);
+        }
+      } catch (error) {
+        console.error('Error submitting feedback:', error);
+        // Don't show error to user - feedback is non-critical
+      }
+    }
   };
   
   // Extract all unique sources from citations
   const mediaSources: MediaSource[] = [];
   const webLinks: WebSource[] = [];
+  const pdfSources: WebSource[] = [];
   
   citations.forEach(citation => {
     citation.retrievedReferences.forEach(ref => {
@@ -70,6 +98,14 @@ export function CitationsDisplay({ citations }: CitationsDisplayProps) {
           mediaType = 'image';
         } else if (url.match(/\.(mp4|webm|mov|avi)$/i)) {
           mediaType = 'video';
+        } else if (url.match(/\.pdf$/i)) {
+          // Handle PDF files
+          const title = metadata['title'] || metadata['name'] || 'PDF Document';
+          pdfSources.push({ 
+            url: location.url, 
+            title 
+          });
+          return; // Don't add to mediaSources
         }
         
         if (mediaType === 'image' || mediaType === 'video') {
@@ -109,8 +145,11 @@ export function CitationsDisplay({ citations }: CitationsDisplayProps) {
   const uniqueWebLinks = webLinks.filter((link, index, self) => 
     index === self.findIndex(l => l.url === link.url)
   );
+  const uniquePdfSources = pdfSources.filter((pdf, index, self) => 
+    index === self.findIndex(p => p.url === pdf.url)
+  );
   
-  if (uniqueWebLinks.length === 0 && uniqueMedia.length === 0) {
+  if (uniqueWebLinks.length === 0 && uniqueMedia.length === 0 && uniquePdfSources.length === 0) {
     return null;
   }
   
@@ -129,12 +168,30 @@ export function CitationsDisplay({ citations }: CitationsDisplayProps) {
         </div>
       )}
       
-      {/* Web links section - if any */}
-      {uniqueWebLinks.length > 0 && (
-        <div className={`flex flex-wrap gap-2 ${uniqueMedia.length > 0 ? 'mt-4' : ''}`}>
-          {uniqueWebLinks.slice(0, 4).map((link, index) => (
-            <WebLinkBadge key={`web-${index}`} link={link} />
-          ))}
+      {/* Sources section - PDFs and Web links */}
+      {(uniqueWebLinks.length > 0 || uniquePdfSources.length > 0) && (
+        <div className={`${uniqueMedia.length > 0 ? 'mt-4' : ''}`}>
+          <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wide">Sources</p>
+          <div className="flex flex-wrap gap-2">
+            {/* PDF sources */}
+            {uniquePdfSources.slice(0, 3).map((pdf, index) => (
+              <a
+                key={`pdf-${index}`}
+                href={pdf.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-sm transition-colors border border-red-100"
+              >
+                <FileText size={14} className="shrink-0" />
+                <span className="truncate max-w-[200px]">{pdf.title}</span>
+                <ExternalLink size={12} className="shrink-0 opacity-60" />
+              </a>
+            ))}
+            {/* Web links */}
+            {uniqueWebLinks.slice(0, 4).map((link, index) => (
+              <WebLinkBadge key={`web-${index}`} link={link} />
+            ))}
+          </div>
         </div>
       )}
       
@@ -310,10 +367,11 @@ function WebLinkBadge({ link }: WebLinkBadgeProps) {
       href={link.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white text-slate-600 rounded-full border border-slate-200 hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)] transition-colors"
+      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors border border-blue-100"
     >
-      <ExternalLink size={12} />
-      <span className="max-w-[120px] truncate">{link.title}</span>
+      <Globe size={14} className="shrink-0" />
+      <span className="max-w-[200px] truncate">{link.title}</span>
+      <ExternalLink size={12} className="shrink-0 opacity-60" />
     </a>
   );
 }

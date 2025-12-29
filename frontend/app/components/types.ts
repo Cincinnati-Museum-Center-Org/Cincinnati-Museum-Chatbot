@@ -22,6 +22,7 @@ export interface Message {
   content: string;
   isStreaming?: boolean;
   citations?: Citation[];
+  conversationId?: string; // Unique ID for this Q&A pair (for feedback)
 }
 
 export interface MediaSource {
