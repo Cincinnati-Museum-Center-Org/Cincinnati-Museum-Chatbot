@@ -1,0 +1,74 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Food and Mood with Dr. Barbara Walker"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "019adb75-aed5-9f67-9b54-310fd7d739ed"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Programs \u2013 Food Science"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Build Your Own Power Bowl: Food as Medicine Series Powered by the Osher Center for Integrative Health at UC Join us for a nourishing, hands-on cooking class where participants will build vibrant power bowls featuring quinoa, marinated tempeh, and a rainbow of fresh, colorful vegetables. After we cook and enjoy our meal, Dr. Barbara Walker will lead an engaging presentation on the connection between what we eat and how we feel, exploring food, mood, and gut health. A delicious and uplifting exper"
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "January 29, 2026 at 6:00 PM"
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "single"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/019adb75-aed5-9f67-9b54-310fd7d739ed"
+      },
+      "includeForEmbedding": false
+    }
+  }
+}

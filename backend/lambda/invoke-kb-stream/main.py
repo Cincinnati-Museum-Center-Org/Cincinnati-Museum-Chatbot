@@ -8,6 +8,7 @@ API Reference:
 
 import os
 import json
+import re
 import boto3
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
@@ -29,9 +30,38 @@ bedrock_agent_runtime = boto3.client("bedrock-agent-runtime")
 
 # Environment variables
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID")
+AWS_REGION = os.environ.get("AWS_REGION")
 
 # Model ID for generation - using global inference profile
 MODEL_ID = "global.amazon.nova-2-lite-v1:0"
+
+
+def s3_uri_to_public_url(s3_uri: str) -> str | None:
+    """
+    Convert S3 URI to public HTTPS URL.
+    Only converts URIs from the public/ prefix for security.
+    
+    Input:  s3://bucket-name/public/folder/image.jpg
+    Output: https://bucket-name.s3.us-east-1.amazonaws.com/public/folder/image.jpg
+    
+    Returns None if the URI is not from the public/ folder.
+    """
+    if not s3_uri or "/public/" not in s3_uri:
+        return None
+    
+    # Parse S3 URI: s3://bucket-name/key
+    match = re.match(r"^s3://([^/]+)/(.+)$", s3_uri)
+    if not match:
+        return None
+    
+    bucket_name, key = match.groups()
+    
+    # Double-check the key starts with public/
+    if not key.startswith("public/"):
+        return None
+    
+    # Return public HTTPS URL
+    return f"https://{bucket_name}.s3.{AWS_REGION}.amazonaws.com/{key}"
 
 async def stream_kb_response(query: str, session_id: str = None, number_of_results: int = 5):
     """
@@ -122,6 +152,10 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
 def format_citation(citation: dict) -> dict:
     """
     Format a single citation from the RetrieveAndGenerateStream response.
+    
+    Security: Only includes S3 references from the public/ folder.
+    S3 URIs are converted to public HTTPS URLs.
+    Private S3 content and supplemental bucket content are filtered out.
     """
     formatted = {
         "retrievedReferences": []
@@ -130,30 +164,57 @@ def format_citation(citation: dict) -> dict:
     retrieved_references = citation.get("retrievedReferences", [])
     
     for ref in retrieved_references:
-        formatted_ref = {
-            "content": {},
-            "location": {},
-            "metadata": ref.get("metadata", {}),
-        }
-        
-        # Extract content
-        content = ref.get("content", {})
-        if "text" in content:
-            formatted_ref["content"]["text"] = content["text"]
-        
-        # Extract location (S3 or WEB)
         location = ref.get("location", {})
         location_type = location.get("type", "")
-        formatted_ref["location"]["type"] = location_type
         
+        # Handle S3 locations - only include public/ folder content
         if location_type == "S3":
             s3_location = location.get("s3Location", {})
-            formatted_ref["location"]["uri"] = s3_location.get("uri", "")
+            s3_uri = s3_location.get("uri", "")
+            
+            # Convert to public URL - returns None if not in public/ folder
+            public_url = s3_uri_to_public_url(s3_uri)
+            
+            if public_url:
+                # Only include if it's from the public folder
+                formatted_ref = {
+                    "content": {},
+                    "location": {
+                        "type": "S3",
+                        "url": public_url,  # Use public HTTPS URL instead of S3 URI
+                    },
+                    "metadata": ref.get("metadata", {}),
+                }
+                
+                # Extract content
+                content = ref.get("content", {})
+                if "text" in content:
+                    formatted_ref["content"]["text"] = content["text"]
+                
+                formatted["retrievedReferences"].append(formatted_ref)
+            # else: Skip private S3 content (not in public/ folder)
+        
+        # Handle WEB locations - always include (from web crawler)
         elif location_type == "WEB":
             web_location = location.get("webLocation", {})
-            formatted_ref["location"]["url"] = web_location.get("url", "")
-        
-        formatted["retrievedReferences"].append(formatted_ref)
+            web_url = web_location.get("url", "")
+            
+            if web_url:
+                formatted_ref = {
+                    "content": {},
+                    "location": {
+                        "type": "WEB",
+                        "url": web_url,
+                    },
+                    "metadata": ref.get("metadata", {}),
+                }
+                
+                # Extract content
+                content = ref.get("content", {})
+                if "text" in content:
+                    formatted_ref["content"]["text"] = content["text"]
+                
+                formatted["retrievedReferences"].append(formatted_ref)
     
     return formatted
 

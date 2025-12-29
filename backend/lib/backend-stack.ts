@@ -37,12 +37,39 @@ export class MuseumChatbot extends cdk.Stack {
     // ========================================
 
     // Data source bucket - stores museum documents (PDFs, images, text files)
+    // Public access is enabled for the public/ prefix only via bucket policy below
     const museumDataBucket = new s3.Bucket(this, "MuseumDataBucket", {
       enforceSSL: true,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       versioned: true,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      // Allow public access to be configured via bucket policy for public/ prefix
+      blockPublicAccess: new s3.BlockPublicAccess({
+        blockPublicAcls: true,
+        ignorePublicAcls: true,
+        blockPublicPolicy: false,  // Allow bucket policy to grant public access
+        restrictPublicBuckets: false,  // Allow public access via bucket policy
+      }),
+      // CORS configuration for frontend access to images
+      cors: [
+        {
+          allowedHeaders: ["*"],
+          allowedMethods: [
+            s3.HttpMethods.GET,
+            s3.HttpMethods.HEAD,
+          ],
+          allowedOrigins: ["*"],  // Allow all origins for public images
+          exposedHeaders: [],
+        },
+      ],
     });
+
+    // Add bucket policy to allow public read access ONLY to the public/ prefix
+    museumDataBucket.addToResourcePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      principals: [new iam.AnyPrincipal()],
+      actions: ["s3:GetObject"],
+      resources: [`${museumDataBucket.bucketArn}/public/*`],
+    }));
 
     // Create placeholder files to establish folder structure for museum data
     const prefixes = ['public/', 'private/'];
@@ -552,6 +579,12 @@ export class MuseumChatbot extends cdk.Stack {
     new cdk.CfnOutput(this, "UserTableArn", {
       value: userTable.tableArn,
       description: "DynamoDB table ARN for user information",
+    });
+
+    // Public URL base for accessing images in the public/ prefix
+    new cdk.CfnOutput(this, "PublicAssetsUrl", {
+      value: `https://${museumDataBucket.bucketRegionalDomainName}/public`,
+      description: "Base URL for publicly accessible museum assets (images in public/ prefix)",
     });
   }
 }

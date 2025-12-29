@@ -1,0 +1,81 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "OMNIMAX\u00ae Dinner Date"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "019ac1b5-6554-c8af-e146-0cbc98bbfdc1"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Programs \u2013 Events"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Join us for a dome-cooked meal! Inspired by some of our favorite OMNIMAX\u00ae films, we\u2019re curating themed three-course menus and guiding you with the tools and skills to cook through it together. It\u2019s our immersive take on dinner and a movie. Registration includes cooking demonstration and OMNIMAX\u00ae screening. 21+ (beer, wine and specialty cocktail included). Upcoming OMNIMAX\u00ae Dinner Dates January 23, 2026: Secrets of the Sea March 27, 2026: Hubble July 17, 2026: Ohio: Wild at Heart November 20, 202"
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": ""
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "repeating"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/019ac1b5-6554-c8af-e146-0cbc98bbfdc1"
+      },
+      "includeForEmbedding": false
+    },
+    "available_until": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "2026-11-21T04:59:59Z"
+      },
+      "includeForEmbedding": true
+    }
+  }
+}

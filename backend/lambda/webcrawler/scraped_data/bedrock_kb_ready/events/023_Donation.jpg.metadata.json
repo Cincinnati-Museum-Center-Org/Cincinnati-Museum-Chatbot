@@ -1,0 +1,74 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Donation"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "3bb0610e-dd05-7dac-dc4d-2e09f4d27b89"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Donation"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Make a gift today and help us continue to inspire curiosity, ignite imagination, and bring people together."
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Support Cincinnati Museum Center Today!"
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "single"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/3bb0610e-dd05-7dac-dc4d-2e09f4d27b89"
+      },
+      "includeForEmbedding": false
+    }
+  }
+}

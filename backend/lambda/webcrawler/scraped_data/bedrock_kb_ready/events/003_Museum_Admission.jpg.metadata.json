@@ -1,0 +1,81 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Museum Admission"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "1662158c-1505-dfeb-0d0c-fcd719a11cb8"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Museum Admission"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Includes admission to Children's Museum, Museum of Natural History & Science, and Cincinnati History Museum. November 14, 2025 - January 5, 2026 : Includes Holiday Junction!"
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": ""
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "repeating"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/1662158c-1505-dfeb-0d0c-fcd719a11cb8"
+      },
+      "includeForEmbedding": false
+    },
+    "available_until": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "2026-04-13T03:59:59Z"
+      },
+      "includeForEmbedding": true
+    }
+  }
+}

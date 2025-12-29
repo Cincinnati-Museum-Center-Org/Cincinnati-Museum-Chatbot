@@ -48,6 +48,13 @@
         "stringValue": "Cincinnati Museum Center"
       },
       "includeForEmbedding": false
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "photograph"
+      },
+      "includeForEmbedding": false
     }
   }
 }

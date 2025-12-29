@@ -1,0 +1,81 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Auschwitz: Not Long Ago. Not Far Away. Exhibition Book"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "9564c531-0dd5-449c-6013-02ebd65d396c"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Featured Exhibit"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "This book tells a story to shake the conscience of the world. It is the catalogue of the first-ever traveling exhibition about the Auschwitz concentration camp, where 1.1 million people\u2015mostly Jews, but also non-Jewish Poles, Roma, and others\u2015lost their lives. More than 280 objects and images from the exhibition are illustrated herein. Drawn from the Auschwitz-Birkenau State Museum and other collections around the world, they range from the intimate (such as victims\u2019 family snapshots and persona"
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "by Luis Ferreiro, Miriam Greenbaum, Robert Jan van Pelt (Editor)"
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "repeating"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/9564c531-0dd5-449c-6013-02ebd65d396c"
+      },
+      "includeForEmbedding": false
+    },
+    "available_until": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "2026-04-13T03:59:59Z"
+      },
+      "includeForEmbedding": true
+    }
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Auschwitz. Not Long Ago. Not Far Away Timed Ticket"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "0193e00f-ee03-ecf5-e9f0-39294e8303f5"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Featured Exhibit"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Through this daunting selection of more than 500 original artifacts from the Auschwitz-Birkenau State Museum in Poland, as well as more than 20 institutions and museums all over the world, Auschwitz. Not long ago. Not far away. portrays the complex reality of the notorious camp while sharing firsthand stories from those who survived, and those who perished."
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Exhibit runs October 18 2025 - April 12, 2026"
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "timed_entry"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/0193e00f-ee03-ecf5-e9f0-39294e8303f5"
+      },
+      "includeForEmbedding": false
+    },
+    "available_until": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "2026-04-13T03:59:59Z"
+      },
+      "includeForEmbedding": true
+    }
+  }
+}

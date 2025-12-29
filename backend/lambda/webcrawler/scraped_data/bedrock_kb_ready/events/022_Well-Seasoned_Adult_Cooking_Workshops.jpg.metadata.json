@@ -1,0 +1,81 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Well-Seasoned: Adult Cooking Workshops"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "019a0773-2eb2-b51e-d369-a6f27fb2b09c"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Programs \u2013 Food Science"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Whether you're a kitchen novice or a seasoned home cook, our hands-on classes invite you to chop, saut\u00e9, and savor your way through an unforgettable culinary experience. Explore essential techniques, global flavors, and creative twists on classic dishes. Come for the skills, stay for the delicious results. Upcoming programs: February 13, 5-7pm: Mediterranean Flavors: A Collaborative Experience Experience the vibrant flavors of the Mediterranean in this collaborative cooking class! Working in sma"
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "February 13, 2026"
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "repeating"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/019a0773-2eb2-b51e-d369-a6f27fb2b09c"
+      },
+      "includeForEmbedding": false
+    },
+    "available_until": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "2026-02-14T04:59:59Z"
+      },
+      "includeForEmbedding": true
+    }
+  }
+}

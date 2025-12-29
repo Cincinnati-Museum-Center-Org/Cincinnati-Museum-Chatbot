@@ -1,0 +1,81 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "OMNIMAX\u00ae National Parks Adventure"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "0190b2f3-5945-127a-22c9-5e04f39be7f5"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Omnimax"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Narrated by Academy Award\u00ae winner Robert Redford, National Parks Adventure takes audiences on the ultimate off-trail adventure into the nation's awe-inspiring great outdoors and untamed wilderness. Immersive cinematography takes viewers soaring over red rock canyons, hurtling up craggy mountain peaks and into other-worldly realms found within America's most legendary outdoor playgrounds, including Yellowstone, Glacier National Park, Yosemite, and Arches. No food or drink is permitted. Runtime: 5"
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Robert D. Lindner Family OMNIMAX Theater"
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "timed_entry"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/0190b2f3-5945-127a-22c9-5e04f39be7f5"
+      },
+      "includeForEmbedding": false
+    },
+    "available_until": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "2026-01-11T04:59:59Z"
+      },
+      "includeForEmbedding": true
+    }
+  }
+}

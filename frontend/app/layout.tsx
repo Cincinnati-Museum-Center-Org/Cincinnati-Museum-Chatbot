@@ -14,6 +14,11 @@ export const metadata: Metadata = {
   description: "CincyMuse is your digital guide to the Cincinnati Museum Center. Get information about exhibits, plan your visit, buy tickets, and explore collections.",
   keywords: ["Cincinnati Museum Center", "museum", "exhibits", "tickets", "Cincinnati", "CincyMuse"],
   authors: [{ name: "Cincinnati Museum Center" }],
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
   openGraph: {
     title: "CincyMuse - Your Digital Guide",
     description: "Your digital guide to the Cincinnati Museum Center",
@@ -28,7 +33,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} antialiased`}>
+      <body className={`${inter.variable} antialiased`} suppressHydrationWarning>
         <LanguageProvider>
           {children}
         </LanguageProvider>

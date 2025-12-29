@@ -1,0 +1,81 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Junior Chefs\u202f"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "0199eeeb-9033-a702-8f62-9e1504724beb"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Programs \u2013 Food Science"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Come cook with us! Hone your skills as we focus on kitchen tools and techniques and slice, saut\u00e9 and sear our way through tasty recipes. Registration for these classes includes one adult and one child together . Upcoming programs: December 6: Asian Street Food Favorites: Dumplings, Fried Rice, and Boba Get ready to roll up your sleeves and explore the flavors and techniques behind some of Asia\u2019s favorite street foods! In this hands-on class, you will learn how to fold and boil dumplings to perfe"
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "December 6, 2025, January 10 & February 7, 2026<br> Saturdays, 11 a.m. - 1:30 p.m."
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "repeating"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/0199eeeb-9033-a702-8f62-9e1504724beb"
+      },
+      "includeForEmbedding": false
+    },
+    "available_until": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "2026-02-08T04:59:59Z"
+      },
+      "includeForEmbedding": true
+    }
+  }
+}

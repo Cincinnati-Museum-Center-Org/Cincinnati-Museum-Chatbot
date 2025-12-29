@@ -1,0 +1,81 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Homeschool Cooking Club"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "dcf361a9-7342-c98c-e214-0e87cb96c606"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Programs \u2013 Food Science"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Have you ever wondered why bread rises or cheese melts? Explore the science and connections behind food, from the first chop to the last bite. Upcoming programs: January 15: The Ultimate Umami Bomb: Ramen Discover the science behind a perfect bowl of ramen! In this hands-on class, you\u2019ll learn how to make a flavorful umami broth, prepare a perfectly cooked hard-boiled egg, and assemble toppings for maximum flavor. Along the way, we\u2019ll explore how science affects texture, taste, and cooking techn"
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "January 15 & February 26, 2026<br> Thursdays, 11 a.m. - 12:30 p.m."
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "repeating"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/dcf361a9-7342-c98c-e214-0e87cb96c606"
+      },
+      "includeForEmbedding": false
+    },
+    "available_until": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "2026-02-27T04:59:59Z"
+      },
+      "includeForEmbedding": true
+    }
+  }
+}

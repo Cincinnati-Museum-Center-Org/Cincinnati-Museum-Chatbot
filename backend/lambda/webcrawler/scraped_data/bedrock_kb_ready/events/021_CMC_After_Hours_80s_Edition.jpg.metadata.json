@@ -1,0 +1,74 @@
+{
+  "metadataAttributes": {
+    "title": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "CMC After Hours: 80s Edition"
+      },
+      "includeForEmbedding": true
+    },
+    "event_id": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "0199e37e-350a-d125-e9f6-cc1a5bd9a573"
+      },
+      "includeForEmbedding": true
+    },
+    "category": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Programs \u2013 Events"
+      },
+      "includeForEmbedding": true
+    },
+    "description": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Break out the leg warmers, tease that hair and dust off your neon \u2014 it's time to party like it's 1985! Join us for a totally tubular CMC After Hours: 80s Edition. Whether you're a material girl or just wanna have fun, this is your chance to relive the magic of childhood in your favorite nostalgic playground \u2014 with grown-up perks. So, grab your squad, dress in your raddest 80s gear and get ready for a blast from the past! It\u2019s gonna be like, totally awesome. This is a ticketed event for adults 21"
+      },
+      "includeForEmbedding": true
+    },
+    "subtitle": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "February 12, 2026 at 7:00 p.m."
+      },
+      "includeForEmbedding": true
+    },
+    "event_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "single"
+      },
+      "includeForEmbedding": true
+    },
+    "content_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "event"
+      },
+      "includeForEmbedding": false
+    },
+    "media_type": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Event Image"
+      },
+      "includeForEmbedding": false
+    },
+    "source": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "Cincinnati Museum Center Events"
+      },
+      "includeForEmbedding": false
+    },
+    "ticket_url": {
+      "value": {
+        "type": "STRING",
+        "stringValue": "https://tickets.cincymuseum.org/cincymuseum/events/0199e37e-350a-d125-e9f6-cc1a5bd9a573"
+      },
+      "includeForEmbedding": false
+    }
+  }
+}
