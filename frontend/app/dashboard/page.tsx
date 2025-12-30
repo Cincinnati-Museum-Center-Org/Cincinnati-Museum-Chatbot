@@ -173,18 +173,16 @@ export default function DashboardPage() {
     
     if (append) {
         setConversations((prev) => [...prev, ...(conversationsData.conversations || [])]);
+        // Use functional update to avoid stale closure
+        setTotalLoaded((prev) => prev + (conversationsData.conversations?.length || 0));
     } else {
       setConversations(conversationsData.conversations || []);
+      setTotalLoaded(conversationsData.conversations?.length || 0);
     }
     
     setHasMore(conversationsData.hasMore || false);
-      setTotalLoaded(
-        append
-          ? totalLoaded + (conversationsData.conversations?.length || 0)
-          : conversationsData.conversations?.length || 0
-      );
     },
-    [user?.idToken, feedbackFilter, dateFilter, totalLoaded]
+    [user?.idToken, feedbackFilter, dateFilter]
   );
 
   // Fetch all data
