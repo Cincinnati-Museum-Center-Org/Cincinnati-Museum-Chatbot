@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "aws-cdk-lib": "2.232.1",
+    "@aws-cdk/aws-amplify-alpha": "2.232.1-alpha.0",
+    "@cdklabs/generative-ai-cdk-constructs": "^0.1.304",
     "constructs": "^10.0.0"
   }
 }

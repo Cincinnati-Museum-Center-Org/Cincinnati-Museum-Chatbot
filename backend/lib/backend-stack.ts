@@ -10,11 +10,10 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as os from "os";
-import {
-  opensearchserverless,
-  opensearch_vectorindex,
-  bedrock as bedrockL2,
-} from "@cdklabs/generative-ai-cdk-constructs";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as amplify from "@aws-cdk/aws-amplify-alpha";
+import { AwsCustomResource, AwsCustomResourcePolicy, PhysicalResourceId, } from "aws-cdk-lib/custom-resources";
+import { opensearchserverless, opensearch_vectorindex, bedrock as bedrockL2, } from "@cdklabs/generative-ai-cdk-constructs";
 
 export class MuseumChatbot extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -24,6 +23,15 @@ export class MuseumChatbot extends cdk.Stack {
     const aws_account = cdk.Stack.of(this).account;
     console.log(`AWS Region: ${aws_region}`);
 
+    const githubToken = this.node.tryGetContext("githubToken");
+    const githubOwner = this.node.tryGetContext("githubOwner");
+    const githubRepo = this.node.tryGetContext("githubRepo");
+
+    if (!githubToken || !githubOwner || !githubRepo)
+      throw new Error(
+        "Missing required context variable(s): githubToken, githubOwner, and/or githubRepo. Please provide all in CDK context (e.g., cdk deploy -c githubToken=your_github_token -c githubOwner=your_github_owner -c githubRepo=your_github_repo)"
+      );
+
     const hostArchitecture = os.arch();
     console.log(`Host architecture: ${hostArchitecture}`);
 
@@ -32,6 +40,75 @@ export class MuseumChatbot extends cdk.Stack {
         ? lambda.Architecture.ARM_64
         : lambda.Architecture.X86_64;
     console.log(`Lambda architecture: ${lambdaArchitecture}`);
+
+    const githubToken_secret_manager = new secretsmanager.Secret(this,"GitHubToken", {
+        secretName: "github-secret-token",
+        description: "GitHub Personal Access Token for Amplify",
+        secretStringValue: cdk.SecretValue.unsafePlainText(githubToken),
+      });
+
+
+    const amplifyApp = new amplify.App(this, "AmplifyFrontendUI", {
+      sourceCodeProvider: new amplify.GitHubSourceCodeProvider({
+        owner: githubOwner,
+        repository: githubRepo,
+        oauthToken: githubToken_secret_manager.secretValue,
+      }),
+      buildSpec: cdk.aws_codebuild.BuildSpec.fromObjectToYaml({
+        version: 1,
+        frontend: {
+          phases: {
+            preBuild: {
+              commands: ["cd frontend", "npm ci"],
+            },
+            build: {
+              commands: ["npm run build"],
+            },
+          },
+          artifacts: {
+            baseDirectory: "frontend/out",
+            files: ["**/*"],
+          },
+          cache: {
+            paths: ["frontend/node_modules/**/*"],
+          },
+        },
+      }),
+      customRules: [
+        {
+          source: "</^[^.]+$|\\.(?!(css|gif|ico|jpg|jpeg|js|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>",
+          target: "/index.html",
+          status: amplify.RedirectStatus.REWRITE,
+        },
+        {
+          source: "/",
+          target: "/index.html",
+          status: amplify.RedirectStatus.REWRITE,
+        },
+        {
+          source: "/admin",
+          target: "/index.html",
+          status: amplify.RedirectStatus.REWRITE,
+        },
+        {
+          source: "/dashboard",
+          target: "/index.html",
+          status: amplify.RedirectStatus.REWRITE,
+        },
+      ],
+    });
+
+    const mainBranch = amplifyApp.addBranch("master", {
+      autoBuild: true,
+      stage: "PRODUCTION",
+    });
+
+    // Create Amplify app URL constant for CORS
+    const amplifyAppUrl = amplifyApp.appId
+      ? `https://master.${amplifyApp.appId}.amplifyapp.com`
+      : "*";
+
+    githubToken_secret_manager.grantRead(amplifyApp);
 
     // ========================================
     // S3 Data Source Bucket
@@ -737,6 +814,53 @@ export class MuseumChatbot extends cdk.Stack {
       authorizationType: apigateway.AuthorizationType.COGNITO,
     });
 
+    new AwsCustomResource(this, "TriggerAmplifyBuild", {
+      onCreate: {
+        service: "Amplify",
+        action: "startJob",
+        parameters: {
+          appId: amplifyApp.appId,
+          branchName: mainBranch.branchName, // e.g. "main"
+          jobType: "RELEASE", // or REBUILD / RETRY / etc.
+        },
+        // ensure a new physical ID on every deploy so it actually runs each time
+        physicalResourceId: PhysicalResourceId.of(
+          `${amplifyApp.appId}-${mainBranch.branchName}-${Date.now()}`
+        ),
+      },
+      // if you also want it on updates:
+      onUpdate: {
+        service: "Amplify",
+        action: "startJob",
+        parameters: {
+          appId: amplifyApp.appId,
+          branchName: mainBranch.branchName,
+          jobType: "RELEASE",
+        },
+        physicalResourceId: PhysicalResourceId.of(
+          `${amplifyApp.appId}-${mainBranch.branchName}-${Date.now()}`
+        ),
+      },
+      policy: AwsCustomResourcePolicy.fromSdkCalls({
+        resources: [
+          // the app itself
+          `arn:aws:amplify:${this.region}:${this.account}:apps/${amplifyApp.appId}`,
+          // allow startJob on any branch/job under your "main" branch
+          `arn:aws:amplify:${this.region}:${this.account}:apps/${amplifyApp.appId}/branches/${mainBranch.branchName}/jobs/*`,
+        ],
+      }),
+    });
+
+    // ========================================
+    // Amplify Environment Variables
+    // ========================================
+    // Add environment variables to the Amplify branch for the frontend
+    mainBranch.addEnvironment("NEXT_PUBLIC_CHAT_API_URL", `${api.url}chat`);
+    mainBranch.addEnvironment("NEXT_PUBLIC_ADMIN_API_URL", `${api.url}admin`);
+    mainBranch.addEnvironment("NEXT_PUBLIC_COGNITO_USER_POOL_ID", adminUserPool.userPoolId);
+    mainBranch.addEnvironment("NEXT_PUBLIC_COGNITO_CLIENT_ID", adminAppClient.userPoolClientId);
+    mainBranch.addEnvironment("NEXT_PUBLIC_AWS_REGION", aws_region);
+
     // ========================================
     // Outputs
     // ========================================
@@ -751,11 +875,6 @@ export class MuseumChatbot extends cdk.Stack {
       description: "S3 bucket for supplemental data (multimodal extracted images)",
     });
 
-    new cdk.CfnOutput(this, "OpenSearchCollectionArn", {
-      value: vectorCollection.collectionArn,
-      description: "OpenSearch Serverless Collection ARN for vector storage",
-    });
-
     new cdk.CfnOutput(this, "OpenSearchCollectionEndpoint", {
       value: vectorCollection.collectionEndpoint,
       description: "OpenSearch Serverless Collection Endpoint",
@@ -766,34 +885,9 @@ export class MuseumChatbot extends cdk.Stack {
       description: "Bedrock Knowledge Base ID",
     });
 
-    new cdk.CfnOutput(this, "KnowledgeBaseArn", {
-      value: knowledgeBase.attrKnowledgeBaseArn,
-      description: "Bedrock Knowledge Base ARN",
-    });
-
-    new cdk.CfnOutput(this, "DataSourceId", {
-      value: dataSource.attrDataSourceId,
-      description: "Data Source ID for S3 documents",
-    });
-
-    new cdk.CfnOutput(this, "WebCrawlerDataSourceId", {
-      value: webCrawlerDataSource.attrDataSourceId,
-      description: "Data Source ID for web crawler (Museum websites)",
-    });
-
-    new cdk.CfnOutput(this, "InvokeKbLambdaArn", {
-      value: invokeKbLambda.functionArn,
-      description: "Lambda function ARN for invoking Knowledge Base",
-    });
-
     new cdk.CfnOutput(this, "InvokeKbLambdaName", {
       value: invokeKbLambda.functionName,
       description: "Lambda function name for invoking Knowledge Base",
-    });
-
-    new cdk.CfnOutput(this, "StreamingLambdaArn", {
-      value: invokeKbStreamLambda.functionArn,
-      description: "Streaming Lambda function ARN",
     });
 
     new cdk.CfnOutput(this, "ChatApiUrl", {
@@ -811,19 +905,9 @@ export class MuseumChatbot extends cdk.Stack {
       description: "DynamoDB table for storing user information",
     });
 
-    new cdk.CfnOutput(this, "UserTableArn", {
-      value: userTable.tableArn,
-      description: "DynamoDB table ARN for user information",
-    });
-
     new cdk.CfnOutput(this, "ConversationHistoryTableName", {
       value: conversationHistoryTable.tableName,
       description: "DynamoDB table for storing conversation history and analytics",
-    });
-
-    new cdk.CfnOutput(this, "ConversationHistoryTableArn", {
-      value: conversationHistoryTable.tableArn,
-      description: "DynamoDB table ARN for conversation history",
     });
 
     // Admin Dashboard Outputs
@@ -846,6 +930,11 @@ export class MuseumChatbot extends cdk.Stack {
     new cdk.CfnOutput(this, "PublicAssetsUrl", {
       value: `https://${museumDataBucket.bucketRegionalDomainName}/public`,
       description: "Base URL for publicly accessible museum assets (images in public/ prefix)",
+    });
+
+    new cdk.CfnOutput(this, "AmplifyAppUrl", {
+      value: `https://main.${amplifyApp.defaultDomain}`,
+      description: "Amplify hosted frontend URL",
     });
   }
 }
