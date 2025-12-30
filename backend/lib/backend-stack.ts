@@ -75,23 +75,22 @@ export class MuseumChatbot extends cdk.Stack {
         },
       }),
       customRules: [
-        {
-          source: "</^[^.]+$|\\.(?!(css|gif|ico|jpg|jpeg|js|png|txt|svg|woff|woff2|ttf|map|json|webp)$)([^.]+$)/>",
-          target: "/index.html",
-          status: amplify.RedirectStatus.REWRITE,
-        },
-        {
-          source: "/",
-          target: "/index.html",
-          status: amplify.RedirectStatus.REWRITE,
-        },
+        // Specific routes - must come BEFORE the catch-all rule
+        // Next.js static export generates /admin.html and /dashboard.html
         {
           source: "/admin",
-          target: "/index.html",
+          target: "/admin.html",
           status: amplify.RedirectStatus.REWRITE,
         },
         {
           source: "/dashboard",
+          target: "/dashboard.html",
+          status: amplify.RedirectStatus.REWRITE,
+        },
+        // Catch-all for SPA behavior - routes without file extensions go to index.html
+        // This handles any other client-side routes
+        {
+          source: "</^[^.]+$|\\.(?!(css|gif|ico|jpg|jpeg|js|png|txt|svg|woff|woff2|ttf|map|json|webp|html)$)([^.]+$)/>",
           target: "/index.html",
           status: amplify.RedirectStatus.REWRITE,
         },
