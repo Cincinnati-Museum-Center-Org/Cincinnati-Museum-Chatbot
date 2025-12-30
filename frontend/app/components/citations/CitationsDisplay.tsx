@@ -9,6 +9,7 @@ import { WebLinkBadge } from './WebLinkBadge';
 import { MediaModal } from './MediaModal';
 import { PdfModal } from './PdfModal';
 import { FeedbackButtons } from './FeedbackButtons';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface CitationsDisplayProps {
   citations: Citation[];
@@ -22,6 +23,7 @@ interface CitationsDisplayProps {
  * Note: Backend filters citations to only include public S3 content and converts URIs to HTTPS URLs
  */
 export function CitationsDisplay({ citations, conversationId }: CitationsDisplayProps) {
+  const { t } = useLanguage();
   const [selectedMedia, setSelectedMedia] = useState<MediaSource | null>(null);
   const [selectedPdf, setSelectedPdf] = useState<WebSource | null>(null);
 
@@ -51,7 +53,7 @@ export function CitationsDisplay({ citations, conversationId }: CitationsDisplay
       {/* Sources section - PDFs and Web links */}
       {(webLinks.length > 0 || pdfSources.length > 0) && (
         <div className={`${mediaSources.length > 0 ? 'mt-4' : ''}`}>
-          <p className="text-xs text-slate-500 mb-3 font-medium uppercase tracking-wide">Sources</p>
+          <p className="text-xs text-slate-500 mb-3 font-medium uppercase tracking-wide">{t.sources || 'Sources'}</p>
 
           {/* PDF preview cards */}
           {pdfSources.length > 0 && (

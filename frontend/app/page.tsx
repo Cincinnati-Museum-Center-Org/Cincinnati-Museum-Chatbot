@@ -13,6 +13,7 @@ import {
   type Message,
   type Citation,
 } from './components';
+import { ConfirmModal } from './components/ConfirmModal';
 
 export default function Home() {
   const { language, setLanguage, t, getQuickActionPrompt } = useLanguage();
@@ -20,6 +21,8 @@ export default function Home() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [pendingLanguage, setPendingLanguage] = useState<'en' | 'es' | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -33,6 +36,29 @@ export default function Home() {
 
   // Generate unique ID for messages
   const generateId = () => Math.random().toString(36).substring(2, 15);
+
+  // Handle language change with confirmation
+  const handleLanguageChange = (newLanguage: 'en' | 'es') => {
+    if (newLanguage === language) return;
+    
+    // If there are messages, show confirmation modal
+    if (messages.length > 0) {
+      setPendingLanguage(newLanguage);
+      setShowLanguageModal(true);
+    } else {
+      setLanguage(newLanguage);
+    }
+  };
+
+  // Confirm language change
+  const confirmLanguageChange = () => {
+    if (pendingLanguage) {
+      setMessages([]);
+      setSessionId(null);
+      setLanguage(pendingLanguage);
+      setPendingLanguage(null);
+    }
+  };
 
   // Handle sending a message
   const sendMessage = async (messageText: string) => {
@@ -246,7 +272,7 @@ export default function Home() {
         {/* Language Toggle */}
         <div className="flex items-center gap-1 bg-white/20 rounded-full p-1">
           <button
-            onClick={() => setLanguage('en')}
+            onClick={() => handleLanguageChange('en')}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
               language === 'en'
                 ? 'bg-white text-[var(--text-primary)] shadow-sm'
@@ -256,7 +282,7 @@ export default function Home() {
             {t.english}
           </button>
           <button
-            onClick={() => setLanguage('es')}
+            onClick={() => handleLanguageChange('es')}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
               language === 'es'
                 ? 'bg-white text-[var(--text-primary)] shadow-sm'
@@ -394,6 +420,24 @@ export default function Home() {
           </form>
         </div>
       </div>
+
+      {/* Language Change Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showLanguageModal}
+        onClose={() => {
+          setShowLanguageModal(false);
+          setPendingLanguage(null);
+        }}
+        onConfirm={confirmLanguageChange}
+        title={language === 'en' ? 'Change Language?' : '¿Cambiar idioma?'}
+        message={
+          language === 'en'
+            ? 'Switching languages will clear your current conversation history. This action cannot be undone.'
+            : 'Cambiar de idioma borrará tu historial de conversación actual. Esta acción no se puede deshacer.'
+        }
+        confirmText={language === 'en' ? 'Continue' : 'Continuar'}
+        cancelText={language === 'en' ? 'Cancel' : 'Cancelar'}
+      />
     </div>
   );
 }

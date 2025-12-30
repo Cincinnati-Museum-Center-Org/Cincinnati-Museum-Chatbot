@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ThumbsUp, ThumbsDown, Check } from 'lucide-react';
 import { getApiConfig } from '../../config/i18n';
+import { useLanguage } from '../../context/LanguageContext';
 import type { FeedbackType } from './types';
 
 interface FeedbackButtonsProps {
@@ -10,6 +11,7 @@ interface FeedbackButtonsProps {
 }
 
 export function FeedbackButtons({ conversationId }: FeedbackButtonsProps) {
+  const { t } = useLanguage();
   const [feedback, setFeedback] = useState<FeedbackType>(null);
   const [showCheck, setShowCheck] = useState(false);
   const [isFading, setIsFading] = useState(false);
@@ -67,7 +69,7 @@ export function FeedbackButtons({ conversationId }: FeedbackButtonsProps) {
         isFading ? 'opacity-0' : 'opacity-100'
       }`}
     >
-      <span className="text-sm text-slate-500">Was this helpful?</span>
+      <span className="text-sm text-slate-500">{t.wasThisHelpful || 'Was this helpful?'}</span>
 
       {/* Thumbs Up */}
       <button
@@ -80,7 +82,7 @@ export function FeedbackButtons({ conversationId }: FeedbackButtonsProps) {
               ? 'opacity-0 scale-75'
               : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
         }`}
-        aria-label="Yes, helpful"
+        aria-label={t.yesHelpful || 'Yes, helpful'}
       >
         <ThumbsUp
           size={18}
@@ -115,7 +117,7 @@ export function FeedbackButtons({ conversationId }: FeedbackButtonsProps) {
               ? 'opacity-0 scale-75'
               : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
         }`}
-        aria-label="No, not helpful"
+        aria-label={t.noNotHelpful || 'No, not helpful'}
       >
         <ThumbsDown
           size={18}

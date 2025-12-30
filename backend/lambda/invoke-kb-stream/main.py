@@ -141,36 +141,50 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
     conversation_id = str(uuid.uuid4())
     start_time = time.time()
     
-    # For Spanish: append instruction after query so retrieval still uses original text
-    # The model sees: "user question [Responde en español]"
-    input_text = query
+    # Build knowledge base configuration
+    kb_config = {
+        "knowledgeBaseId": KNOWLEDGE_BASE_ID,
+        "modelArn": MODEL_ID,
+        "retrievalConfiguration": {
+            "vectorSearchConfiguration": {
+                "numberOfResults": number_of_results,
+                # Use hybrid search (semantic + text) for better accuracy
+                "overrideSearchType": "HYBRID"
+            }
+        },
+        # Enable query decomposition for complex queries
+        "orchestrationConfiguration": {
+            "queryTransformationConfiguration": {
+                "type": "QUERY_DECOMPOSITION"
+            }
+        }
+    }
+    
+    # For Spanish: use generationConfiguration.promptTemplate to instruct the model
+    # This keeps the user's query clean while adding system-level instructions
+    # NOTE: $output_format_instructions$ is REQUIRED for citations to be displayed
     if language == "es":
-        input_text = f"{query}\n\n[Responde en español]"
+        kb_config["generationConfiguration"] = {
+            "promptTemplate": {
+                "textPromptTemplate": """Eres un agente de respuesta a preguntas. Te proporcionaré un conjunto de resultados de búsqueda. El usuario te hará una pregunta. Tu trabajo es responder la pregunta del usuario usando SOLO información de los resultados de búsqueda. Si los resultados de búsqueda no contienen información que pueda responder la pregunta, indica que no pudiste encontrar una respuesta exacta.
+
+IMPORTANTE: DEBES responder ÚNICAMENTE en español. No uses inglés bajo ninguna circunstancia.
+
+Aquí están los resultados de búsqueda en orden numerado:
+$search_results$
+
+$output_format_instructions$"""
+            }
+        }
     
     # Build request per AWS API specification
     request_params = {
         "input": {
-            "text": input_text
+            "text": query
         },
         "retrieveAndGenerateConfiguration": {
             "type": "KNOWLEDGE_BASE",
-            "knowledgeBaseConfiguration": {
-                "knowledgeBaseId": KNOWLEDGE_BASE_ID,
-                "modelArn": MODEL_ID,
-                "retrievalConfiguration": {
-                    "vectorSearchConfiguration": {
-                        "numberOfResults": number_of_results,
-                        # Use hybrid search (semantic + text) for better accuracy
-                        "overrideSearchType": "HYBRID"
-                    }
-                },
-                # Enable query decomposition for complex queries
-                "orchestrationConfiguration": {
-                    "queryTransformationConfiguration": {
-                        "type": "QUERY_DECOMPOSITION"
-                    }
-                }
-            }
+            "knowledgeBaseConfiguration": kb_config
         }
     }
     

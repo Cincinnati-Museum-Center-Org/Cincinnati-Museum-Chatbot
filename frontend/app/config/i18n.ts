@@ -32,6 +32,14 @@ export interface Translations {
   thinking: string;
   errorMessage: string;
   
+  // Feedback
+  wasThisHelpful: string;
+  yesHelpful: string;
+  noNotHelpful: string;
+  
+  // Sources
+  sources: string;
+  
   // Accessibility
   sendMessage: string;
   chatHistory: string;
@@ -68,6 +76,14 @@ export const translations: Record<Language, Translations> = {
     thinking: 'Thinking...',
     errorMessage: 'Sorry, something went wrong. Please try again.',
     
+    // Feedback
+    wasThisHelpful: 'Was this helpful?',
+    yesHelpful: 'Yes, helpful',
+    noNotHelpful: 'No, not helpful',
+    
+    // Sources
+    sources: 'Sources',
+    
     // Accessibility
     sendMessage: 'Send message',
     chatHistory: 'Chat history',
@@ -101,6 +117,14 @@ export const translations: Record<Language, Translations> = {
     // Chat messages
     thinking: 'Pensando...',
     errorMessage: 'Lo siento, algo salió mal. Por favor, inténtalo de nuevo.',
+    
+    // Feedback
+    wasThisHelpful: '¿Fue útil?',
+    yesHelpful: 'Sí, útil',
+    noNotHelpful: 'No, no fue útil',
+    
+    // Sources
+    sources: 'Fuentes',
     
     // Accessibility
     sendMessage: 'Enviar mensaje',
