@@ -104,7 +104,7 @@ export class MuseumChatbot extends cdk.Stack {
 
     // Table to collect and store user information from chatbot interactions
     const userTable = new dynamodb.Table(this, "UserTable", {
-      tableName: `MuseumChatbot-Users-${Date.now()}`,
+      tableName: `MuseumChatbot-Users`,
       partitionKey: {
         name: "userId",
         type: dynamodb.AttributeType.STRING,
@@ -574,6 +574,27 @@ export class MuseumChatbot extends cdk.Stack {
       },
     });
 
+    // Add CORS headers to all Gateway error responses (4xx, 5xx)
+    // This ensures CORS headers are present even when Lambda fails or auth fails
+    // Without this, browser shows confusing "CORS error" instead of actual error (401, 500, etc.)
+    const corsResponseHeaders = {
+      "Access-Control-Allow-Origin": "'*'",
+      "Access-Control-Allow-Headers": "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'",
+      "Access-Control-Allow-Methods": "'GET,POST,PUT,DELETE,OPTIONS'",
+    };
+
+    // Add CORS to DEFAULT_4XX responses (includes 401 Unauthorized, 403 Forbidden)
+    api.addGatewayResponse("GatewayResponse4XX", {
+      type: apigateway.ResponseType.DEFAULT_4XX,
+      responseHeaders: corsResponseHeaders,
+    });
+
+    // Add CORS to DEFAULT_5XX responses (includes 500, 502, 503, 504)
+    api.addGatewayResponse("GatewayResponse5XX", {
+      type: apigateway.ResponseType.DEFAULT_5XX,
+      responseHeaders: corsResponseHeaders,
+    });
+
     // Ensure API is created after the account configuration
     api.node.addDependency(apiGatewayAccount);
 
@@ -591,15 +612,8 @@ export class MuseumChatbot extends cdk.Stack {
     chatResource.addMethod("POST", streamingIntegration);
 
     // Create /feedback resource for submitting conversation feedback
+    // NOTE: This will be configured later to use adminApiLambda (non-streaming)
     const feedbackResource = api.root.addResource("feedback");
-
-    // Standard Lambda integration (no streaming needed for feedback)
-    const feedbackIntegration = new apigateway.LambdaIntegration(invokeKbStreamLambda, {
-      proxy: true,
-    });
-
-    // POST /feedback - Submit feedback for a conversation
-    feedbackResource.addMethod("POST", feedbackIntegration);
 
     // ========================================
     // Cognito User Pool for Admin Authentication
@@ -654,12 +668,29 @@ export class MuseumChatbot extends cdk.Stack {
       memorySize: 256,
       environment: {
         CONVERSATION_HISTORY_TABLE: conversationHistoryTable.tableName,
+        DATE_INDEX: "date-timestamp-index",
+        FEEDBACK_INDEX: "feedback-timestamp-index",
       },
       description: "Admin API for dashboard analytics and conversation management",
     });
 
     // Grant read access to conversation history table
     conversationHistoryTable.grantReadData(adminApiLambda);
+    
+    // Grant write access for feedback updates
+    conversationHistoryTable.grantWriteData(adminApiLambda);
+
+    // ========================================
+    // Feedback Endpoint (uses Admin API Lambda - no streaming)
+    // ========================================
+    
+    // Feedback integration using adminApiLambda (non-streaming, avoids Lambda Web Adapter issues)
+    const feedbackIntegration = new apigateway.LambdaIntegration(adminApiLambda, {
+      proxy: true,
+    });
+
+    // POST /feedback - Submit feedback for a conversation (no auth required)
+    feedbackResource.addMethod("POST", feedbackIntegration);
 
     // ========================================
     // Admin API Gateway (Cognito Authorized)

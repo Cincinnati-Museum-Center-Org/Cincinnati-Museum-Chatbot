@@ -22,9 +22,9 @@ from boto3.dynamodb.conditions import Key, Attr
 dynamodb = boto3.resource("dynamodb")
 CONVERSATION_HISTORY_TABLE = os.environ.get("CONVERSATION_HISTORY_TABLE")
 
-# GSI names
-DATE_INDEX = "date-timestamp-index"
-FEEDBACK_INDEX = "feedback-timestamp-index"
+# GSI names from environment variables
+DATE_INDEX = os.environ.get("DATE_INDEX", "date-timestamp-index")
+FEEDBACK_INDEX = os.environ.get("FEEDBACK_INDEX", "feedback-timestamp-index")
 
 # Cache configuration
 CACHE_TTL_SECONDS = 60  # Cache stats for 60 seconds
@@ -157,9 +157,9 @@ def query_date_stats(table_name: str, date: str) -> dict:
         for item in response.get("Items", []):
             stats["count"] += 1
             feedback = item.get("feedback")
-                if feedback == "pos":
+            if feedback == "pos":
                 stats["positive"] += 1
-                elif feedback == "neg":
+            elif feedback == "neg":
                 stats["negative"] += 1
             else:
                 stats["no_feedback"] += 1
@@ -296,15 +296,15 @@ def get_stats(event: dict) -> dict:
         # Daily data points
         current_date = start_dt
         while current_date <= end_dt:
-        date_str = current_date.strftime("%Y-%m-%d")
+            date_str = current_date.strftime("%Y-%m-%d")
             count = daily_stats.get(date_str, {}).get("count", 0)
-        conversations_chart.append({
-            "date": date_str,
+            conversations_chart.append({
+                "date": date_str,
                 "count": count,
-            "dayName": current_date.strftime("%a"),
+                "dayName": current_date.strftime("%a"),
                 "label": current_date.strftime("%-d"),
-        })
-        current_date += timedelta(days=1)
+            })
+            current_date += timedelta(days=1)
     
     elif days <= 90:
         # Weekly aggregation
@@ -481,13 +481,14 @@ def get_conversations(event: dict) -> dict:
             "ProjectionExpression": projection,
             "ExpressionAttributeNames": expr_names,
         }
-    response = table.scan(**scan_kwargs)
-    all_items.extend(response.get("Items", []))
-    
-        while "LastEvaluatedKey" in response and len(all_items) < offset + limit + 100:
-        scan_kwargs["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+
         response = table.scan(**scan_kwargs)
         all_items.extend(response.get("Items", []))
+    
+        while "LastEvaluatedKey" in response and len(all_items) < offset + limit + 100:
+            scan_kwargs["ExclusiveStartKey"] = response["LastEvaluatedKey"]
+            response = table.scan(**scan_kwargs)
+            all_items.extend(response.get("Items", []))
     
         all_items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     
@@ -708,6 +709,11 @@ def handler(event, context):
     if http_method == "OPTIONS":
         return json_response(200, {})
     
+    # POST endpoints
+    if http_method == "POST":
+        if "/feedback" in path:
+            return submit_feedback(event)
+    
     if http_method == "GET":
         if "/admin/stats" in path:
             return get_stats(event)
@@ -719,3 +725,79 @@ def handler(event, context):
             return get_conversations(event)
     
     return json_response(404, {"error": "Not found"})
+
+
+def submit_feedback(event: dict) -> dict:
+    """
+    Submit feedback for a conversation.
+    
+    Request body:
+    {
+        "conversationId": "string" (required),
+        "feedback": "pos" | "neg" (required)
+    }
+    """
+    try:
+        body = event.get("body", "{}")
+        if isinstance(body, str):
+            payload = json.loads(body)
+        else:
+            payload = body
+        
+        conversation_id = payload.get("conversationId")
+        feedback_value = payload.get("feedback")
+        
+        print(f"Processing feedback: {conversation_id} -> {feedback_value}")
+        
+        if not conversation_id:
+            return json_response(400, {"error": "Missing required parameter: conversationId"})
+        
+        # Accept multiple formats and normalize to pos/neg
+        if feedback_value in ["positive", "+", "up"]:
+            feedback_value = "pos"
+        elif feedback_value in ["negative", "-", "down"]:
+            feedback_value = "neg"
+        
+        if feedback_value not in ["pos", "neg"]:
+            return json_response(400, {"error": "Invalid feedback value. Must be 'pos' or 'neg'"})
+        
+        table = dynamodb.Table(CONVERSATION_HISTORY_TABLE)
+        
+        # Find the item by conversationId (timestamp is sort key)
+        response = table.query(
+            KeyConditionExpression=Key("conversationId").eq(conversation_id),
+            Limit=1
+        )
+        
+        if not response.get("Items"):
+            return json_response(404, {"error": "Conversation not found"})
+        
+        item = response["Items"][0]
+        timestamp = item["timestamp"]
+        
+        # Update the feedback
+        feedback_timestamp = datetime.now(timezone.utc).isoformat()
+        
+        table.update_item(
+            Key={
+                "conversationId": conversation_id,
+                "timestamp": timestamp
+            },
+            UpdateExpression="SET feedback = :fb, feedbackTs = :fbt",
+            ExpressionAttributeValues={
+                ":fb": feedback_value,
+                ":fbt": feedback_timestamp
+            }
+        )
+        
+        print(f"Updated feedback for conversation {conversation_id}: {feedback_value}")
+        
+        return json_response(200, {
+            "success": True,
+            "conversationId": conversation_id,
+            "feedback": feedback_value
+        })
+        
+    except Exception as e:
+        print(f"Error submitting feedback: {e}")
+        return json_response(500, {"error": str(e)})

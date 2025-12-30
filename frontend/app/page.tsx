@@ -19,12 +19,7 @@ export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string>(() => {
-    // Generate a unique session ID on component mount
-    const id = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    console.log('🔵 New session initialized:', id);
-    return id;
-  });
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -70,7 +65,7 @@ export default function Home() {
     setMessages(prev => [...prev, assistantMessage]);
 
     try {
-      console.log('🔵 Sending request with sessionId:', sessionId);
+      console.log('🔵 Sending request with sessionId:', sessionId || '(new session)');
       const response = await fetch(apiConfig.chatEndpoint, {
         method: 'POST',
         headers: {
@@ -78,7 +73,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           query: messageText.trim(),
-          sessionId: sessionId,
+          sessionId: sessionId || undefined,
           numberOfResults: 5,
           language: language,
         }),
@@ -94,6 +89,7 @@ export default function Home() {
       let accumulatedText = '';
       let accumulatedCitations: Citation[] = [];
       let conversationId: string | undefined;
+      let buffer = ''; // Buffer for incomplete SSE data
 
       if (reader) {
         while (true) {
@@ -101,7 +97,12 @@ export default function Home() {
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
+          buffer += chunk;
+          
+          // Process complete lines from buffer
+          const lines = buffer.split('\n');
+          // Keep the last potentially incomplete line in buffer
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
             if (line.startsWith('event: ')) {
@@ -109,6 +110,8 @@ export default function Home() {
             }
             if (line.startsWith('data: ')) {
               const data = line.substring(6);
+              if (!data.trim()) continue; // Skip empty data lines
+              
               try {
                 const parsed = JSON.parse(data);
                 
@@ -129,6 +132,12 @@ export default function Home() {
                   setSessionId(parsed.sessionId);
                 }
                 
+                // Handle session expired - clear session so next request starts fresh
+                if (parsed.message && parsed.message.includes('Session expired')) {
+                  console.log('🟡 Session expired, will use new session from response');
+                  setSessionId(null);
+                }
+                
                 if (parsed.text) {
                   accumulatedText += parsed.text;
                   setMessages(prev =>
@@ -141,6 +150,7 @@ export default function Home() {
                 }
                 
                 if (parsed.citations) {
+                  console.log('🟣 Received citations:', parsed.citations.length, 'citation groups');
                   accumulatedCitations = parsed.citations;
                   setMessages(prev =>
                     prev.map(msg =>
@@ -164,8 +174,9 @@ export default function Home() {
                 if (parsed.error) {
                   throw new Error(parsed.error);
                 }
-              } catch {
-                // Skip invalid JSON
+              } catch (parseError) {
+                // Log JSON parse errors (could indicate split data)
+                console.warn('JSON parse error:', parseError, 'Data:', data.substring(0, 100));
               }
             }
           }

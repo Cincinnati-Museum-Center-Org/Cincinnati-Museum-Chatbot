@@ -26,6 +26,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Initialize AWS clients
@@ -159,15 +160,32 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
         }
     }
     
-    if session_id:
-        request_params["sessionId"] = session_id
+    # Only use session ID if it looks like a valid Bedrock session ID
+    # Bedrock session IDs are UUIDs, not our custom format
+    use_session_id = None
+    if session_id and not session_id.startswith("session-"):
+        use_session_id = session_id
+        request_params["sessionId"] = use_session_id
     
     try:
         # Send conversation ID as first event (for feedback tracking)
         yield f"event: conversationId\ndata: {json.dumps({'conversationId': conversation_id})}\n\n"
         
         # Call RetrieveAndGenerateStream API
-        response = bedrock_agent_runtime.retrieve_and_generate_stream(**request_params)
+        try:
+            response = bedrock_agent_runtime.retrieve_and_generate_stream(**request_params)
+        except Exception as e:
+            error_msg = str(e)
+            # If session is invalid/expired, retry without session ID
+            if "Session with Id" in error_msg and "is not valid" in error_msg:
+                print(f"Session expired, retrying without session ID: {use_session_id}")
+                if "sessionId" in request_params:
+                    del request_params["sessionId"]
+                # Notify frontend to clear session
+                yield f"event: sessionExpired\ndata: {json.dumps({'message': 'Session expired, starting new session'})}\n\n"
+                response = bedrock_agent_runtime.retrieve_and_generate_stream(**request_params)
+            else:
+                raise
         
         # Get session ID from response
         response_session_id = response.get("sessionId")
@@ -307,108 +325,6 @@ def format_citation(citation: dict) -> dict:
 async def catch_all(request: Request, request_path: str):
     """Catch-all route to handle all GET requests (health check, etc.)"""
     return {"status": "healthy", "knowledgeBaseId": KNOWLEDGE_BASE_ID}
-
-
-@app.post("/feedback")
-async def submit_feedback(request: Request):
-    """
-    Submit feedback for a conversation.
-    
-    Request body:
-    {
-        "conversationId": "string" (required),
-        "feedback": "pos" | "neg" (required)
-    }
-    
-    Response:
-    {
-        "success": true,
-        "conversationId": "string",
-        "feedback": "string"
-    }
-    """
-    if not CONVERSATION_HISTORY_TABLE:
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Feedback storage not configured"}
-        )
-    
-    try:
-        body = await request.body()
-        payload = json.loads(body.decode('utf-8'))
-        
-        conversation_id = payload.get("conversationId")
-        feedback = payload.get("feedback")
-        
-        if not conversation_id:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "Missing required parameter: conversationId"}
-            )
-        
-        # Accept multiple formats and normalize to pos/neg
-        if feedback in ["positive", "+"]:
-            feedback = "pos"
-        elif feedback in ["negative", "-"]:
-            feedback = "neg"
-        
-        if feedback not in ["pos", "neg"]:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "Invalid feedback value. Must be 'pos' or 'neg'"}
-            )
-        
-        table = dynamodb.Table(CONVERSATION_HISTORY_TABLE)
-        
-        # First, we need to find the item by conversationId
-        # Since timestamp is the sort key, we need to query
-        response = table.query(
-            KeyConditionExpression="conversationId = :cid",
-            ExpressionAttributeValues={":cid": conversation_id},
-            Limit=1
-        )
-        
-        if not response.get("Items"):
-            return JSONResponse(
-                status_code=404,
-                content={"error": "Conversation not found"}
-            )
-        
-        item = response["Items"][0]
-        timestamp = item["timestamp"]
-        
-        # Update the feedback (pos or neg)
-        feedback_timestamp = datetime.now(timezone.utc).isoformat()
-        
-        table.update_item(
-            Key={
-                "conversationId": conversation_id,
-                "timestamp": timestamp
-            },
-            UpdateExpression="SET feedback = :fb, feedbackTs = :fbt",
-            ExpressionAttributeValues={
-                ":fb": feedback,
-                ":fbt": feedback_timestamp
-            }
-        )
-        
-        print(f"Updated feedback for conversation {conversation_id}: {feedback}")
-        
-        return JSONResponse(
-            status_code=200,
-            content={
-                "success": True,
-                "conversationId": conversation_id,
-                "feedback": feedback
-            }
-        )
-        
-    except Exception as e:
-        print(f"Error submitting feedback: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
 
 
 @app.post("/{request_path:path}")
