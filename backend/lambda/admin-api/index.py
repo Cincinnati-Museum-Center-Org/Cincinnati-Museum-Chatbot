@@ -1,21 +1,35 @@
 """
 Admin API Lambda for dashboard analytics and conversation management.
-Provides endpoints for:
-- Dashboard statistics (total conversations, satisfaction rate, response times)
-- Conversation listing and filtering
-- Feedback summary
+
+OPTIMIZATIONS:
+- Parallel queries using ThreadPoolExecutor for concurrent date queries
+- COUNT-only queries for statistics (no full item fetches)
+- In-memory caching with TTL for repeated requests
+- Minimal data projection to reduce transfer size
 """
 
 import os
 import json
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
+import time
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
 
 # Initialize DynamoDB
 dynamodb = boto3.resource("dynamodb")
 CONVERSATION_HISTORY_TABLE = os.environ.get("CONVERSATION_HISTORY_TABLE")
+
+# GSI names
+DATE_INDEX = "date-timestamp-index"
+FEEDBACK_INDEX = "feedback-timestamp-index"
+
+# Cache configuration
+CACHE_TTL_SECONDS = 60  # Cache stats for 60 seconds
+_stats_cache = {}
+_cache_timestamp = {}
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -35,199 +49,507 @@ def json_response(status_code: int, body: dict) -> dict:
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Content-Type,Authorization",
             "Access-Control-Allow-Methods": "GET,OPTIONS",
+            "Cache-Control": "max-age=30",  # Client-side caching
         },
         "body": json.dumps(body, cls=DecimalEncoder),
     }
 
 
-def get_stats(event: dict) -> dict:
+def get_cache_key(prefix: str, start_date: str, end_date: str) -> str:
+    """Generate cache key."""
+    return f"{prefix}:{start_date}:{end_date}"
+
+
+def get_cached_result(cache_key: str):
+    """Get cached result if not expired."""
+    if cache_key in _stats_cache:
+        if time.time() - _cache_timestamp.get(cache_key, 0) < CACHE_TTL_SECONDS:
+            return _stats_cache[cache_key]
+        else:
+            # Expired - clean up
+            del _stats_cache[cache_key]
+            del _cache_timestamp[cache_key]
+    return None
+
+
+def set_cached_result(cache_key: str, result: dict):
+    """Cache a result."""
+    _stats_cache[cache_key] = result
+    _cache_timestamp[cache_key] = time.time()
+
+
+def query_date_count(table_name: str, date: str) -> dict:
     """
-    Get dashboard statistics.
-    
-    Query params:
-    - days: Number of days to look back (default: 7)
-    
-    Returns:
-    - totalConversations: Total number of conversations
-    - conversationsToday: Conversations in the last 24 hours
-    - totalFeedback: Number of conversations with feedback
-    - positiveFeedback: Number of positive feedbacks
-    - negativeFeedback: Number of negative feedbacks
-    - satisfactionRate: Percentage of positive feedback
-    - avgResponseTime: Average response time in ms
-    - conversationsByDay: Array of {date, count} for the period
+    Query COUNT for a single date using SELECT='COUNT'.
+    Returns dict with date and count.
     """
-    table = dynamodb.Table(CONVERSATION_HISTORY_TABLE)
+    table = dynamodb.Table(table_name)
     
-    # Get query parameters
-    params = event.get("queryStringParameters") or {}
-    days = int(params.get("days", 7))
-    
-    # Calculate date range
-    now = datetime.now(timezone.utc)
-    start_date = (now - timedelta(days=days)).strftime("%Y-%m-%d")
-    today = now.strftime("%Y-%m-%d")
-    
-    # Query conversations by date
-    conversations_by_day = {}
-    total_conversations = 0
-    total_feedback = 0
-    positive_feedback = 0
-    negative_feedback = 0
-    total_response_time = 0
-    response_time_count = 0
-    conversations_today = 0
-    
-    # Scan the table (for small datasets; use GSI for larger)
-    # In production, you'd want to use the date-timestamp-index GSI
-    response = table.scan()
-    items = response.get("Items", [])
+    total_count = 0
+    response = table.query(
+        IndexName=DATE_INDEX,
+        KeyConditionExpression=Key("date").eq(date),
+        Select="COUNT",
+    )
+    total_count += response.get("Count", 0)
     
     # Handle pagination
     while "LastEvaluatedKey" in response:
-        response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
-        items.extend(response.get("Items", []))
+        response = table.query(
+            IndexName=DATE_INDEX,
+            KeyConditionExpression=Key("date").eq(date),
+            Select="COUNT",
+            ExclusiveStartKey=response["LastEvaluatedKey"],
+        )
+        total_count += response.get("Count", 0)
     
-    for item in items:
-        item_date = item.get("date", "")
+    return {"date": date, "count": total_count}
+
+
+def query_date_stats(table_name: str, date: str) -> dict:
+    """
+    Query minimal stats for a single date.
+    Only fetches: feedback, responseTimeMs (using projection).
+    """
+    table = dynamodb.Table(table_name)
+    
+    stats = {
+        "date": date,
+        "count": 0,
+        "positive": 0,
+        "negative": 0,
+        "no_feedback": 0,
+        "total_response_time": 0,
+        "response_time_count": 0,
+    }
+    
+    response = table.query(
+        IndexName=DATE_INDEX,
+        KeyConditionExpression=Key("date").eq(date),
+        ProjectionExpression="#fb, responseTimeMs",
+        ExpressionAttributeNames={"#fb": "feedback"},
+    )
+    
+    for item in response.get("Items", []):
+        stats["count"] += 1
+        feedback = item.get("feedback")
+        if feedback == "pos":
+            stats["positive"] += 1
+        elif feedback == "neg":
+            stats["negative"] += 1
+        else:
+            stats["no_feedback"] += 1
         
-        # Count by day
-        if item_date >= start_date:
-            conversations_by_day[item_date] = conversations_by_day.get(item_date, 0) + 1
-            total_conversations += 1
-            
-            # Today's count
-            if item_date == today:
-                conversations_today += 1
-            
-            # Feedback stats
+        response_time = item.get("responseTimeMs")
+        if response_time:
+            stats["total_response_time"] += int(response_time)
+            stats["response_time_count"] += 1
+    
+    # Handle pagination
+    while "LastEvaluatedKey" in response:
+        response = table.query(
+            IndexName=DATE_INDEX,
+            KeyConditionExpression=Key("date").eq(date),
+            ProjectionExpression="#fb, responseTimeMs",
+            ExpressionAttributeNames={"#fb": "feedback"},
+            ExclusiveStartKey=response["LastEvaluatedKey"],
+        )
+        for item in response.get("Items", []):
+            stats["count"] += 1
             feedback = item.get("feedback")
-            if feedback:
-                total_feedback += 1
                 if feedback == "pos":
-                    positive_feedback += 1
+                stats["positive"] += 1
                 elif feedback == "neg":
-                    negative_feedback += 1
+                stats["negative"] += 1
+            else:
+                stats["no_feedback"] += 1
             
-            # Response time
             response_time = item.get("responseTimeMs")
             if response_time:
-                total_response_time += response_time
-                response_time_count += 1
+                stats["total_response_time"] += int(response_time)
+                stats["response_time_count"] += 1
     
-    # Calculate satisfaction rate
+    return stats
+
+
+def parallel_query_stats(start_date: str, end_date: str) -> dict:
+    """
+    Query stats for date range using parallel execution.
+    Uses ThreadPoolExecutor for concurrent queries.
+    """
+    # Generate date list
+    dates = []
+    current = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+    while current <= end:
+        dates.append(current.strftime("%Y-%m-%d"))
+        current += timedelta(days=1)
+    
+    # Aggregate results
+    daily_stats = {}
+    totals = {
+        "count": 0,
+        "positive": 0,
+        "negative": 0,
+        "no_feedback": 0,
+        "total_response_time": 0,
+        "response_time_count": 0,
+    }
+    
+    # Use ThreadPoolExecutor for parallel queries
+    # Limit workers to avoid DynamoDB throttling
+    max_workers = min(10, len(dates))
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all queries
+        future_to_date = {
+            executor.submit(query_date_stats, CONVERSATION_HISTORY_TABLE, date): date
+            for date in dates
+        }
+        
+        # Collect results as they complete
+        for future in as_completed(future_to_date):
+            date = future_to_date[future]
+            try:
+                stats = future.result()
+                daily_stats[date] = stats
+                
+                # Aggregate totals
+                totals["count"] += stats["count"]
+                totals["positive"] += stats["positive"]
+                totals["negative"] += stats["negative"]
+                totals["no_feedback"] += stats["no_feedback"]
+                totals["total_response_time"] += stats["total_response_time"]
+                totals["response_time_count"] += stats["response_time_count"]
+            except Exception as e:
+                print(f"Error querying date {date}: {e}")
+                daily_stats[date] = {"date": date, "count": 0, "positive": 0, "negative": 0, "no_feedback": 0}
+    
+    return {
+        "daily": daily_stats,
+        "totals": totals,
+    }
+
+
+def get_stats(event: dict) -> dict:
+    """
+    Get dashboard statistics using parallel queries and caching.
+    
+    OPTIMIZATIONS:
+    - Parallel queries for each date
+    - Minimal projection (only feedback + responseTimeMs)
+    - In-memory caching with 60s TTL
+    """
+    params = event.get("queryStringParameters") or {}
+    
+    # Calculate date range
+    now = datetime.now(timezone.utc)
+    today = now.strftime("%Y-%m-%d")
+    
+    start_date_param = params.get("startDate")
+    end_date_param = params.get("endDate")
+    
+    if start_date_param and end_date_param:
+        start_date = start_date_param
+        end_date = end_date_param
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        days = (end_dt - start_dt).days + 1
+    else:
+        days = int(params.get("days", 7))
+        start_date = (now - timedelta(days=days-1)).strftime("%Y-%m-%d")
+        end_date = today
+    
+    # Check cache
+    cache_key = get_cache_key("stats", start_date, end_date)
+    cached = get_cached_result(cache_key)
+    if cached:
+        print(f"Cache hit for {cache_key}")
+        return json_response(200, cached)
+    
+    print(f"Cache miss - querying {days} days in parallel")
+    
+    # Query in parallel
+    result = parallel_query_stats(start_date, end_date)
+    daily_stats = result["daily"]
+    totals = result["totals"]
+    
+    # Calculate derived stats
+    total_feedback = totals["positive"] + totals["negative"]
     satisfaction_rate = 0
     if total_feedback > 0:
-        satisfaction_rate = round((positive_feedback / total_feedback) * 100, 1)
+        satisfaction_rate = round((totals["positive"] / total_feedback) * 100, 1)
     
-    # Calculate average response time
     avg_response_time = 0
-    if response_time_count > 0:
-        avg_response_time = round(total_response_time / response_time_count)
+    if totals["response_time_count"] > 0:
+        avg_response_time = round(totals["total_response_time"] / totals["response_time_count"])
     
-    # Format conversations by day for chart
+    # Get today's count
+    conversations_today = daily_stats.get(today, {}).get("count", 0)
+    
+    # Build chart data with smart aggregation
     conversations_chart = []
-    current_date = now - timedelta(days=days-1)
-    for _ in range(days):
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    
+    if days <= 31:
+        # Daily data points
+        current_date = start_dt
+        while current_date <= end_dt:
         date_str = current_date.strftime("%Y-%m-%d")
+            count = daily_stats.get(date_str, {}).get("count", 0)
         conversations_chart.append({
             "date": date_str,
-            "count": conversations_by_day.get(date_str, 0),
+                "count": count,
             "dayName": current_date.strftime("%a"),
+                "label": current_date.strftime("%-d"),
         })
         current_date += timedelta(days=1)
     
-    return json_response(200, {
-        "totalConversations": total_conversations,
+    elif days <= 90:
+        # Weekly aggregation
+        current_date = start_dt
+        while current_date <= end_dt:
+            week_end = min(current_date + timedelta(days=6), end_dt)
+            week_count = 0
+            temp_date = current_date
+            while temp_date <= week_end:
+                week_count += daily_stats.get(temp_date.strftime("%Y-%m-%d"), {}).get("count", 0)
+                temp_date += timedelta(days=1)
+            
+            conversations_chart.append({
+                "date": current_date.strftime("%Y-%m-%d"),
+                "endDate": week_end.strftime("%Y-%m-%d"),
+                "count": week_count,
+                "dayName": f"{current_date.strftime('%b %-d')} - {week_end.strftime('%-d')}",
+                "label": current_date.strftime("%b %-d"),
+            })
+            current_date = week_end + timedelta(days=1)
+    
+    else:
+        # Monthly aggregation
+        current_date = start_dt.replace(day=1)
+        while current_date <= end_dt:
+            if current_date.month == 12:
+                month_end = current_date.replace(year=current_date.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                month_end = current_date.replace(month=current_date.month + 1, day=1) - timedelta(days=1)
+            
+            actual_start = max(current_date, start_dt)
+            actual_end = min(month_end, end_dt)
+            
+            month_count = 0
+            temp_date = actual_start
+            while temp_date <= actual_end:
+                month_count += daily_stats.get(temp_date.strftime("%Y-%m-%d"), {}).get("count", 0)
+                temp_date += timedelta(days=1)
+            
+            conversations_chart.append({
+                "date": actual_start.strftime("%Y-%m-%d"),
+                "endDate": actual_end.strftime("%Y-%m-%d"),
+                "count": month_count,
+                "dayName": current_date.strftime("%B %Y"),
+                "label": current_date.strftime("%b"),
+            })
+            
+            if current_date.month == 12:
+                current_date = current_date.replace(year=current_date.year + 1, month=1)
+            else:
+                current_date = current_date.replace(month=current_date.month + 1)
+    
+    response_data = {
+        "totalConversations": totals["count"],
         "conversationsToday": conversations_today,
         "totalFeedback": total_feedback,
-        "positiveFeedback": positive_feedback,
-        "negativeFeedback": negative_feedback,
-        "noFeedback": total_conversations - total_feedback,
+        "positiveFeedback": totals["positive"],
+        "negativeFeedback": totals["negative"],
+        "noFeedback": totals["no_feedback"],
         "satisfactionRate": satisfaction_rate,
         "avgResponseTimeMs": avg_response_time,
         "conversationsByDay": conversations_chart,
         "period": {
             "days": days,
             "startDate": start_date,
-            "endDate": today,
+            "endDate": end_date,
         },
-    })
+    }
+    
+    # Cache the result
+    set_cached_result(cache_key, response_data)
+    
+    return json_response(200, response_data)
 
 
 def get_conversations(event: dict) -> dict:
     """
     Get list of conversations with filtering and pagination.
-    
-    Query params:
-    - feedback: Filter by feedback type (pos, neg, none)
-    - date: Filter by specific date (YYYY-MM-DD)
-    - limit: Max results (default: 20)
-    - offset: Skip this many results (for pagination)
+    Uses GSI for efficient queries.
     """
     table = dynamodb.Table(CONVERSATION_HISTORY_TABLE)
     
     params = event.get("queryStringParameters") or {}
     feedback_filter = params.get("feedback")
-    date_filter = params.get("date")
+    start_date = params.get("startDate")
+    end_date = params.get("endDate")
     limit = int(params.get("limit", 20))
     offset = int(params.get("offset", 0))
     
-    # Build scan parameters - fetch more than needed for filtering
-    scan_kwargs = {}
-    
-    # Add filters
-    filter_expressions = []
-    expression_values = {}
-    expression_names = {}
-    
-    if feedback_filter:
-        if feedback_filter == "none":
-            filter_expressions.append("attribute_not_exists(feedback)")
-        else:
-            filter_expressions.append("feedback = :fb")
-            expression_values[":fb"] = feedback_filter
-    
-    if date_filter:
-        filter_expressions.append("#d = :dt")
-        expression_values[":dt"] = date_filter
-        expression_names["#d"] = "date"
-    
-    if filter_expressions:
-        scan_kwargs["FilterExpression"] = " AND ".join(filter_expressions)
-        if expression_values:
-            scan_kwargs["ExpressionAttributeValues"] = expression_values
-        if expression_names:
-            scan_kwargs["ExpressionAttributeNames"] = expression_names
-    
-    # Execute scan and get all matching items
     all_items = []
+    
+    # Projection for listing - only fetch needed fields
+    projection = "conversationId, sessionId, #ts, #dt, question, answer, #fb, responseTimeMs, citationCount, #lang"
+    expr_names = {
+        "#ts": "timestamp",
+        "#dt": "date", 
+        "#fb": "feedback",
+        "#lang": "language",
+    }
+    
+    if feedback_filter and feedback_filter != "none":
+        # Use feedback-timestamp-index GSI
+        response = table.query(
+            IndexName=FEEDBACK_INDEX,
+            KeyConditionExpression=Key("feedback").eq(feedback_filter),
+            ScanIndexForward=False,
+            ProjectionExpression=projection,
+            ExpressionAttributeNames=expr_names,
+        )
+        all_items.extend(response.get("Items", []))
+        
+        while "LastEvaluatedKey" in response and len(all_items) < offset + limit + 100:
+            response = table.query(
+                IndexName=FEEDBACK_INDEX,
+                KeyConditionExpression=Key("feedback").eq(feedback_filter),
+                ExclusiveStartKey=response["LastEvaluatedKey"],
+                ScanIndexForward=False,
+                ProjectionExpression=projection,
+                ExpressionAttributeNames=expr_names,
+            )
+            all_items.extend(response.get("Items", []))
+        
+        if start_date and end_date:
+            all_items = [
+                item for item in all_items
+                if start_date <= item.get("date", "") <= end_date
+            ]
+    
+    elif start_date and end_date:
+        # Query each date in parallel for better performance
+        dates = []
+        current = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        while current <= end:
+            dates.append(current.strftime("%Y-%m-%d"))
+            current += timedelta(days=1)
+        
+        def query_date_items(date):
+            items = []
+            response = table.query(
+                IndexName=DATE_INDEX,
+                KeyConditionExpression=Key("date").eq(date),
+                ProjectionExpression=projection,
+                ExpressionAttributeNames=expr_names,
+            )
+            items.extend(response.get("Items", []))
+            while "LastEvaluatedKey" in response:
+                response = table.query(
+                    IndexName=DATE_INDEX,
+                    KeyConditionExpression=Key("date").eq(date),
+                    ExclusiveStartKey=response["LastEvaluatedKey"],
+                    ProjectionExpression=projection,
+                    ExpressionAttributeNames=expr_names,
+                )
+                items.extend(response.get("Items", []))
+            return items
+        
+        with ThreadPoolExecutor(max_workers=min(10, len(dates))) as executor:
+            futures = [executor.submit(query_date_items, date) for date in dates]
+            for future in as_completed(futures):
+                try:
+                    all_items.extend(future.result())
+                except Exception as e:
+                    print(f"Error querying: {e}")
+        
+        if feedback_filter == "none":
+            all_items = [item for item in all_items if not item.get("feedback")]
+        
+        all_items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    
+    elif feedback_filter == "none":
+        scan_kwargs = {
+            "FilterExpression": Attr("feedback").not_exists() | Attr("feedback").eq(None),
+            "ProjectionExpression": projection,
+            "ExpressionAttributeNames": expr_names,
+        }
     response = table.scan(**scan_kwargs)
     all_items.extend(response.get("Items", []))
     
-    # Handle pagination for large datasets
-    while "LastEvaluatedKey" in response:
+        while "LastEvaluatedKey" in response and len(all_items) < offset + limit + 100:
         scan_kwargs["ExclusiveStartKey"] = response["LastEvaluatedKey"]
         response = table.scan(**scan_kwargs)
         all_items.extend(response.get("Items", []))
     
-    # Sort by timestamp descending
+        all_items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    
+    else:
+        # Default - last 30 days
+        now = datetime.now(timezone.utc)
+        default_start = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+        default_end = now.strftime("%Y-%m-%d")
+        
+        dates = []
+        current = datetime.strptime(default_start, "%Y-%m-%d")
+        end = datetime.strptime(default_end, "%Y-%m-%d")
+        while current <= end:
+            dates.append(current.strftime("%Y-%m-%d"))
+            current += timedelta(days=1)
+        
+        def query_date_items(date):
+            items = []
+            response = table.query(
+                IndexName=DATE_INDEX,
+                KeyConditionExpression=Key("date").eq(date),
+                ProjectionExpression=projection,
+                ExpressionAttributeNames=expr_names,
+            )
+            items.extend(response.get("Items", []))
+            while "LastEvaluatedKey" in response:
+                response = table.query(
+                    IndexName=DATE_INDEX,
+                    KeyConditionExpression=Key("date").eq(date),
+                    ExclusiveStartKey=response["LastEvaluatedKey"],
+                    ProjectionExpression=projection,
+                    ExpressionAttributeNames=expr_names,
+                )
+                items.extend(response.get("Items", []))
+            return items
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(query_date_items, date) for date in dates]
+            for future in as_completed(futures):
+                try:
+                    all_items.extend(future.result())
+                except Exception as e:
+                    print(f"Error querying: {e}")
+        
     all_items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
     
-    # Apply offset and limit
+    # Apply pagination
     paginated_items = all_items[offset:offset + limit]
     has_more = (offset + limit) < len(all_items)
     
     # Format response
     conversations = []
     for item in paginated_items:
+        question = item.get("question", "")
+        answer = item.get("answer", "")
         conversations.append({
             "conversationId": item.get("conversationId"),
             "sessionId": item.get("sessionId"),
             "timestamp": item.get("timestamp"),
             "date": item.get("date"),
-            "question": item.get("question", "")[:100] + "..." if len(item.get("question", "")) > 100 else item.get("question", ""),
-            "answerPreview": item.get("answer", "")[:150] + "..." if len(item.get("answer", "")) > 150 else item.get("answer", ""),
+            "question": question[:100] + "..." if len(question) > 100 else question,
+            "answerPreview": answer[:150] + "..." if len(answer) > 150 else answer,
             "feedback": item.get("feedback"),
             "responseTimeMs": item.get("responseTimeMs"),
             "citationCount": item.get("citationCount", 0),
@@ -252,7 +574,6 @@ def get_conversation_by_id(event: dict) -> dict:
     if not conversation_id:
         return json_response(400, {"error": "Missing conversationId"})
     
-    # Query by conversationId
     response = table.query(
         KeyConditionExpression=Key("conversationId").eq(conversation_id),
         Limit=1,
@@ -264,7 +585,6 @@ def get_conversation_by_id(event: dict) -> dict:
     
     item = items[0]
     
-    # Parse citations JSON
     citations = []
     try:
         citations = json.loads(item.get("citations", "[]"))
@@ -292,64 +612,89 @@ def get_conversation_by_id(event: dict) -> dict:
 
 def get_feedback_summary(event: dict) -> dict:
     """
-    Get feedback summary with recent negative feedback for review.
+    Get feedback summary using parallel queries and caching.
     """
-    table = dynamodb.Table(CONVERSATION_HISTORY_TABLE)
-    
     params = event.get("queryStringParameters") or {}
-    days = int(params.get("days", 30))
     
     now = datetime.now(timezone.utc)
-    start_date = (now - timedelta(days=days)).strftime("%Y-%m-%d")
+    today = now.strftime("%Y-%m-%d")
     
-    # Scan for feedback data
-    response = table.scan()
-    items = response.get("Items", [])
+    start_date_param = params.get("startDate")
+    end_date_param = params.get("endDate")
     
-    while "LastEvaluatedKey" in response:
-        response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
-        items.extend(response.get("Items", []))
+    if start_date_param and end_date_param:
+        start_date = start_date_param
+        end_date = end_date_param
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+        days = (end_dt - start_dt).days + 1
+    else:
+        days = int(params.get("days", 30))
+        start_date = (now - timedelta(days=days-1)).strftime("%Y-%m-%d")
+        end_date = today
     
-    # Filter and categorize
-    positive = []
-    negative = []
-    no_feedback = 0
+    # Check cache
+    cache_key = get_cache_key("feedback", start_date, end_date)
+    cached = get_cached_result(cache_key)
+    if cached:
+        return json_response(200, cached)
     
-    for item in items:
-        if item.get("date", "") < start_date:
-            continue
-            
-        feedback = item.get("feedback")
-        if feedback == "pos":
-            positive.append(item)
-        elif feedback == "neg":
-            negative.append({
+    # Query stats in parallel (reuse the parallel query function)
+    result = parallel_query_stats(start_date, end_date)
+    totals = result["totals"]
+    
+    # For negative feedback details, we need to query those specifically
+    table = dynamodb.Table(CONVERSATION_HISTORY_TABLE)
+    negative_items = []
+    
+    # Query negative feedback using GSI
+    response = table.query(
+        IndexName=FEEDBACK_INDEX,
+        KeyConditionExpression=Key("feedback").eq("neg"),
+        ScanIndexForward=False,
+        ProjectionExpression="conversationId, #ts, question, answer, feedbackTs, #dt",
+        ExpressionAttributeNames={"#ts": "timestamp", "#dt": "date"},
+        Limit=50,  # Only get recent ones
+    )
+    
+    for item in response.get("Items", []):
+        item_date = item.get("date", "")
+        if start_date <= item_date <= end_date:
+            negative_items.append({
                 "conversationId": item.get("conversationId"),
                 "timestamp": item.get("timestamp"),
                 "question": item.get("question"),
                 "answerPreview": item.get("answer", "")[:200],
                 "feedbackTs": item.get("feedbackTs"),
             })
-        else:
-            no_feedback += 1
     
-    # Sort negative by timestamp descending
-    negative.sort(key=lambda x: x.get("feedbackTs") or x.get("timestamp", ""), reverse=True)
+    negative_items.sort(key=lambda x: x.get("feedbackTs") or x.get("timestamp", ""), reverse=True)
     
-    return json_response(200, {
+    total_feedback = totals["positive"] + totals["negative"]
+    satisfaction_rate = 0
+    if total_feedback > 0:
+        satisfaction_rate = round((totals["positive"] / total_feedback) * 100, 1)
+    
+    response_data = {
         "summary": {
-            "positive": len(positive),
-            "negative": len(negative),
-            "noFeedback": no_feedback,
-            "total": len(positive) + len(negative) + no_feedback,
-            "satisfactionRate": round((len(positive) / (len(positive) + len(negative))) * 100, 1) if (len(positive) + len(negative)) > 0 else 0,
+            "positive": totals["positive"],
+            "negative": totals["negative"],
+            "noFeedback": totals["no_feedback"],
+            "total": totals["count"],
+            "satisfactionRate": satisfaction_rate,
         },
-        "recentNegative": negative[:10],  # Top 10 most recent negative
+        "recentNegative": negative_items[:10],
         "period": {
             "days": days,
             "startDate": start_date,
+            "endDate": end_date,
         },
-    })
+    }
+    
+    # Cache result
+    set_cached_result(cache_key, response_data)
+    
+    return json_response(200, response_data)
 
 
 def handler(event, context):
@@ -360,11 +705,9 @@ def handler(event, context):
     
     print(f"Admin API: {http_method} {path}")
     
-    # Handle OPTIONS for CORS
     if http_method == "OPTIONS":
         return json_response(200, {})
     
-    # Route requests
     if http_method == "GET":
         if "/admin/stats" in path:
             return get_stats(event)

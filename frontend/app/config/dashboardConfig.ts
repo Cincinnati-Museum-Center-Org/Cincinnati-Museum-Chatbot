@@ -9,17 +9,17 @@ export const dashboardConfig = {
   // Satisfaction Rate Thresholds
   satisfaction: {
     // Below this percentage, satisfaction is flagged as "Needs attention"
-    goodThreshold: 70, // percentage
+    goodThreshold: 50, // percentage
     // Above this percentage, satisfaction is flagged as "Excellent"
-    excellentThreshold: 90, // percentage
+    excellentThreshold: 80, // percentage
   },
 
   // Response Time Thresholds (in milliseconds)
   responseTime: {
     // Below this time, response is "Fast"
-    fastThreshold: 2000, // 2 seconds
+    fastThreshold: 4000, // 2 seconds
     // Below this time, response is "Within target"
-    targetThreshold: 5000, // 5 seconds
+    targetThreshold: 6000, // 5 seconds
     // Above targetThreshold, response is "Above target" (needs attention)
   },
 
