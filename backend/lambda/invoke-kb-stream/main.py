@@ -141,10 +141,27 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
     conversation_id = str(uuid.uuid4())
     start_time = time.time()
     
+    # Add language instruction to the query for non-English responses
+    language_instructions = {
+        "es": "Por favor responde en español. ",
+        "fr": "Veuillez répondre en français. ",
+        "de": "Bitte antworte auf Deutsch. ",
+        "zh": "请用中文回答。",
+        "ja": "日本語で回答してください。",
+        "ko": "한국어로 답변해 주세요. ",
+        "pt": "Por favor, responda em português. ",
+        "it": "Per favore rispondi in italiano. ",
+    }
+    
+    # Prepend language instruction if not English
+    modified_query = query
+    if language != "en" and language in language_instructions:
+        modified_query = language_instructions[language] + query
+    
     # Build request per AWS API specification
     request_params = {
         "input": {
-            "text": query
+            "text": modified_query
         },
         "retrieveAndGenerateConfiguration": {
             "type": "KNOWLEDGE_BASE",
