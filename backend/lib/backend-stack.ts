@@ -608,6 +608,41 @@ export class MuseumChatbot extends cdk.Stack {
     invokeKbStreamLambda.node.addDependency(knowledgeBase);
 
     // ========================================
+    // Lambda Function: User CRUD Operations
+    // ========================================
+
+    // Create IAM role for the User CRUD Lambda function
+    const userCrudLambdaRole = new iam.Role(this, "UserCrudLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      description: "IAM role for User CRUD Lambda",
+      managedPolicies: [
+        iam.ManagedPolicy.fromManagedPolicyArn(
+          this,
+          "UserCrudLambdaBasicExecution",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ),
+      ],
+    });
+
+    // Grant permissions to access DynamoDB User Table
+    userTable.grantReadWriteData(userCrudLambdaRole);
+
+    // Lambda function for User CRUD operations
+    const userCrudLambda = new lambda.Function(this, "UserCrudLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambdaArchitecture,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset("lambda/user-crud"),
+      role: userCrudLambdaRole,
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: {
+        USER_TABLE_NAME: userTable.tableName,
+      },
+      description: "CRUD operations for User Information DynamoDB table",
+    });
+
+    // ========================================
     // REST API Gateway with Response Streaming
     // ========================================
 
@@ -861,6 +896,33 @@ export class MuseumChatbot extends cdk.Stack {
     mainBranch.addEnvironment("NEXT_PUBLIC_AWS_REGION", aws_region);
 
     // ========================================
+    // User CRUD API Endpoints
+    // ========================================
+
+    // Create /users resource
+    const usersResource = api.root.addResource("users");
+
+    // Lambda integration for user CRUD operations
+    const userCrudIntegration = new apigateway.LambdaIntegration(userCrudLambda, {
+      proxy: true,
+    });
+
+    // POST /users - Create user
+    usersResource.addMethod("POST", userCrudIntegration);
+
+    // Create /users/{userId} resource
+    const userResource = usersResource.addResource("{userId}");
+
+    // GET /users/{userId} - Get user(s)
+    userResource.addMethod("GET", userCrudIntegration);
+
+    // PUT /users/{userId} - Update user
+    userResource.addMethod("PUT", userCrudIntegration);
+
+    // DELETE /users/{userId} - Delete user
+    userResource.addMethod("DELETE", userCrudIntegration);
+
+    // ========================================
     // Outputs
     // ========================================
 
@@ -934,6 +996,16 @@ export class MuseumChatbot extends cdk.Stack {
     new cdk.CfnOutput(this, "AmplifyAppUrl", {
       value: `https://main.${amplifyApp.defaultDomain}`,
       description: "Amplify hosted frontend URL",
+    });
+
+    new cdk.CfnOutput(this, "UserCrudLambdaArn", {
+      value: userCrudLambda.functionArn,
+      description: "Lambda function ARN for User CRUD operations",
+    });
+
+    new cdk.CfnOutput(this, "UsersApiUrl", {
+      value: `${api.url}users`,
+      description: "API Gateway URL for user CRUD endpoints (POST, GET, PUT, DELETE /users)",
     });
   }
 }
