@@ -18,6 +18,7 @@ import {
   DashboardStats,
   Conversation,
   FeedbackSummary,
+  User,
   TIME_PERIODS,
 } from './types';
 
@@ -29,6 +30,7 @@ import {
   ConversationsChart,
   SatisfactionPieChart,
   ConversationsTab,
+  UsersTab,
 } from './components';
 
 // Get API config
@@ -45,11 +47,13 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   // UI state
-  const [activeTab, setActiveTab] = useState<'overview' | 'conversations'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'conversations' | 'users'>('overview');
   const [feedbackFilter, setFeedbackFilter] = useState<string>('');
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   
@@ -62,10 +66,14 @@ export default function DashboardPage() {
   // Timezone state
   const [timezone, setTimezone] = useState('America/New_York');
   
-  // Pagination state
+  // Pagination state (conversations)
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [totalLoaded, setTotalLoaded] = useState(0);
+
+  // Users pagination state
+  const [usersPage, setUsersPage] = useState(1);
+  const USERS_PAGE_SIZE = 20;
 
   // Helper to handle session expiry errors
   const handleSessionExpiry = useCallback((err: unknown) => {
@@ -182,7 +190,41 @@ export default function DashboardPage() {
     
     setHasMore(conversationsData.hasMore || false);
     },
-    [user?.idToken, feedbackFilter, dateFilter]
+    [user?.idToken, feedbackFilter, dateFilter, selectedPeriod]
+  );
+
+  // Fetch users with pagination
+  const fetchUsers = useCallback(
+    async (page: number = 1) => {
+      if (!user?.idToken) return;
+
+      const headers = {
+        Authorization: user.idToken,
+        'Content-Type': 'application/json',
+      };
+
+      const offset = (page - 1) * USERS_PAGE_SIZE;
+      const queryParams = `limit=${USERS_PAGE_SIZE}&offset=${offset}`;
+
+      const usersRes = await fetch(
+        `${ADMIN_API_URL}/users?${queryParams}`,
+        { headers }
+      );
+
+      // Check for authentication errors (401/403)
+      if (usersRes.status === 401 || usersRes.status === 403) {
+        throw new Error(SESSION_EXPIRED_ERROR);
+      }
+
+      if (!usersRes.ok) {
+        throw new Error('Failed to fetch users');
+      }
+
+      const usersData = await usersRes.json();
+      setUsers(usersData.users || []);
+      setTotalUsers(usersData.total || 0);
+    },
+    [user?.idToken]
   );
 
   // Fetch all data
@@ -191,8 +233,13 @@ export default function DashboardPage() {
     setError('');
 
     try {
-      await Promise.all([fetchStats(selectedPeriod), fetchConversations(1, false)]);
+      await Promise.all([
+        fetchStats(selectedPeriod), 
+        fetchConversations(1, false),
+        fetchUsers(1),
+      ]);
       setCurrentPage(1);
+      setUsersPage(1);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       if (!handleSessionExpiry(err)) {
@@ -201,7 +248,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchStats, fetchConversations, selectedPeriod, handleSessionExpiry]);
+  }, [fetchStats, fetchConversations, fetchUsers, selectedPeriod, handleSessionExpiry]);
 
   // Initial data fetch
   useEffect(() => {
@@ -300,6 +347,20 @@ export default function DashboardPage() {
     }
   };
 
+  // Handle users page change
+  const handleUsersPageChange = async (page: number) => {
+    setUsersPage(page);
+    setIsLoading(true);
+    try {
+      await fetchUsers(page);
+    } catch (err) {
+      console.error('Error changing users page:', err);
+      handleSessionExpiry(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Apply filter
   const handleFilterChange = async () => {
     setCurrentPage(1);
@@ -392,7 +453,7 @@ export default function DashboardPage() {
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex gap-1">
-            {(['overview', 'conversations'] as const).map((tab) => (
+            {(['overview', 'conversations', 'users'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -501,6 +562,17 @@ export default function DashboardPage() {
             onDateFilterClear={handleDateFilterClear}
             onApplyFilter={handleFilterChange}
             onLoadMore={handleLoadMore}
+          />
+        )}
+
+        {activeTab === 'users' && (
+          <UsersTab
+            users={users}
+            isLoading={isLoading}
+            currentPage={usersPage}
+            totalUsers={totalUsers}
+            pageSize={USERS_PAGE_SIZE}
+            onPageChange={handleUsersPageChange}
           />
         )}
       </main>

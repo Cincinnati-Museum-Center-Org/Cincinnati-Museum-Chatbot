@@ -30,6 +30,16 @@ export interface Conversation {
   language: string;
 }
 
+export interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber?: string;
+  supportQuestion: string;
+  createdAt: string;
+}
+
 export interface FeedbackSummary {
   summary: {
     positive: number;
