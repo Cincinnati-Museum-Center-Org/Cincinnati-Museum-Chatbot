@@ -102,6 +102,12 @@ export class MuseumChatbot extends cdk.Stack {
       stage: "PRODUCTION",
     });
 
+    const testBranch = amplifyApp.addBranch("staging", {
+      autoBuild: true,
+      stage: "STAGING",
+    });
+
+
     // Create Amplify app URL constant for CORS
     const amplifyAppUrl = amplifyApp.appId
       ? `https://master.${amplifyApp.appId}.amplifyapp.com`
