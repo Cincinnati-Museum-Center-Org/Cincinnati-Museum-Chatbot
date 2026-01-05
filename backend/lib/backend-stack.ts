@@ -102,6 +102,11 @@ export class MuseumChatbot extends cdk.Stack {
       stage: "PRODUCTION",
     });
 
+    const featureBranch = amplifyApp.addBranch("feature/user-crud-api", {
+      autoBuild: true,
+      stage: "DEVELOPMENT",
+    });
+
     // Create Amplify app URL constant for CORS
     const amplifyAppUrl = amplifyApp.appId
       ? `https://master.${amplifyApp.appId}.amplifyapp.com`
@@ -779,6 +784,7 @@ export class MuseumChatbot extends cdk.Stack {
       memorySize: 256,
       environment: {
         CONVERSATION_HISTORY_TABLE: conversationHistoryTable.tableName,
+        USER_TABLE_NAME: userTable.tableName,
         DATE_INDEX: "date-timestamp-index",
         FEEDBACK_INDEX: "feedback-timestamp-index",
       },
@@ -790,6 +796,9 @@ export class MuseumChatbot extends cdk.Stack {
     
     // Grant write access for feedback updates
     conversationHistoryTable.grantWriteData(adminApiLambda);
+
+    // Grant read access to user table for admin dashboard
+    userTable.grantReadData(adminApiLambda);
 
     // ========================================
     // Feedback Endpoint (uses Admin API Lambda - no streaming)
@@ -891,15 +900,24 @@ export class MuseumChatbot extends cdk.Stack {
     // Add environment variables to the Amplify branch for the frontend
     mainBranch.addEnvironment("NEXT_PUBLIC_CHAT_API_URL", `${api.url}chat`);
     mainBranch.addEnvironment("NEXT_PUBLIC_ADMIN_API_URL", `${api.url}admin`);
+    mainBranch.addEnvironment("NEXT_PUBLIC_USERS_API_URL", `${api.url}users`);
     mainBranch.addEnvironment("NEXT_PUBLIC_COGNITO_USER_POOL_ID", adminUserPool.userPoolId);
     mainBranch.addEnvironment("NEXT_PUBLIC_COGNITO_CLIENT_ID", adminAppClient.userPoolClientId);
     mainBranch.addEnvironment("NEXT_PUBLIC_AWS_REGION", aws_region);
 
+    // Add same environment variables to feature branch
+    featureBranch.addEnvironment("NEXT_PUBLIC_CHAT_API_URL", `${api.url}chat`);
+    featureBranch.addEnvironment("NEXT_PUBLIC_ADMIN_API_URL", `${api.url}admin`);
+    featureBranch.addEnvironment("NEXT_PUBLIC_USERS_API_URL", `${api.url}users`);
+    featureBranch.addEnvironment("NEXT_PUBLIC_COGNITO_USER_POOL_ID", adminUserPool.userPoolId);
+    featureBranch.addEnvironment("NEXT_PUBLIC_COGNITO_CLIENT_ID", adminAppClient.userPoolClientId);
+    featureBranch.addEnvironment("NEXT_PUBLIC_AWS_REGION", aws_region);
+
     // ========================================
-    // User CRUD API Endpoints
+    // User Registration API (Public - POST only)
     // ========================================
 
-    // Create /users resource
+    // Create /users resource (public endpoint for user self-registration)
     const usersResource = api.root.addResource("users");
 
     // Lambda integration for user CRUD operations
@@ -907,20 +925,36 @@ export class MuseumChatbot extends cdk.Stack {
       proxy: true,
     });
 
-    // POST /users - Create user
+    // POST /users - Create user (public, no auth required)
     usersResource.addMethod("POST", userCrudIntegration);
 
-    // Create /users/{userId} resource
-    const userResource = usersResource.addResource("{userId}");
+    // ========================================
+    // Admin User Management API (Protected - Cognito Auth)
+    // ========================================
 
-    // GET /users/{userId} - Get user(s)
-    userResource.addMethod("GET", userCrudIntegration);
+    // Create /admin/users resource under existing /admin
+    const adminUsersResource = adminResource.addResource("users");
 
-    // PUT /users/{userId} - Update user
-    userResource.addMethod("PUT", userCrudIntegration);
+    // Create /admin/users/{userId} resource
+    const adminUserByIdResource = adminUsersResource.addResource("{userId}");
 
-    // DELETE /users/{userId} - Delete user
-    userResource.addMethod("DELETE", userCrudIntegration);
+    // GET /admin/users/{userId} - Get user(s) (protected)
+    adminUserByIdResource.addMethod("GET", userCrudIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+
+    // PUT /admin/users/{userId} - Update user (protected)
+    adminUserByIdResource.addMethod("PUT", userCrudIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+
+    // DELETE /admin/users/{userId} - Delete user (protected)
+    adminUserByIdResource.addMethod("DELETE", userCrudIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
 
     // ========================================
     // Outputs
@@ -1003,9 +1037,14 @@ export class MuseumChatbot extends cdk.Stack {
       description: "Lambda function ARN for User CRUD operations",
     });
 
-    new cdk.CfnOutput(this, "UsersApiUrl", {
+    new cdk.CfnOutput(this, "UserRegistrationApiUrl", {
       value: `${api.url}users`,
-      description: "API Gateway URL for user CRUD endpoints (POST, GET, PUT, DELETE /users)",
+      description: "API Gateway URL for public user registration (POST /users only)",
+    });
+
+    new cdk.CfnOutput(this, "AdminUsersApiUrl", {
+      value: `${api.url}admin/users`,
+      description: "API Gateway URL for admin user management (GET, PUT, DELETE - requires Cognito auth)",
     });
   }
 }
