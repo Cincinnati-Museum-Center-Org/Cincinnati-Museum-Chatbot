@@ -2,6 +2,7 @@
 export * from './types';
 export { MarkdownContent } from './MarkdownContent';
 export { CitationsDisplay } from './CitationsDisplay';
+export { SupportModal } from './SupportModal';
 
 // Re-export commonly used Lucide icons (optional - can import directly from lucide-react)
 export {
