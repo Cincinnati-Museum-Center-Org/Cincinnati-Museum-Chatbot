@@ -101,12 +101,6 @@ export class MuseumChatbot extends cdk.Stack {
       autoBuild: true,
       stage: "PRODUCTION",
     });
-
-    const featureBranch = amplifyApp.addBranch("feature/user-crud-api", {
-      autoBuild: true,
-      stage: "DEVELOPMENT",
-    });
-
     // Create Amplify app URL constant for CORS
     const amplifyAppUrl = amplifyApp.appId
       ? `https://master.${amplifyApp.appId}.amplifyapp.com`
@@ -904,14 +898,6 @@ export class MuseumChatbot extends cdk.Stack {
     mainBranch.addEnvironment("NEXT_PUBLIC_COGNITO_USER_POOL_ID", adminUserPool.userPoolId);
     mainBranch.addEnvironment("NEXT_PUBLIC_COGNITO_CLIENT_ID", adminAppClient.userPoolClientId);
     mainBranch.addEnvironment("NEXT_PUBLIC_AWS_REGION", aws_region);
-
-    // Add same environment variables to feature branch
-    featureBranch.addEnvironment("NEXT_PUBLIC_CHAT_API_URL", `${api.url}chat`);
-    featureBranch.addEnvironment("NEXT_PUBLIC_ADMIN_API_URL", `${api.url}admin`);
-    featureBranch.addEnvironment("NEXT_PUBLIC_USERS_API_URL", `${api.url}users`);
-    featureBranch.addEnvironment("NEXT_PUBLIC_COGNITO_USER_POOL_ID", adminUserPool.userPoolId);
-    featureBranch.addEnvironment("NEXT_PUBLIC_COGNITO_CLIENT_ID", adminAppClient.userPoolClientId);
-    featureBranch.addEnvironment("NEXT_PUBLIC_AWS_REGION", aws_region);
 
     // ========================================
     // User Registration API (Public - POST only)
