@@ -1,185 +1,568 @@
-# [INSERT_PROJECT_NAME] APIs
+# Cincinnati Museum Chatbot APIs
 
-This document provides comprehensive API documentation for [INSERT_PROJECT_NAME].
+This document provides comprehensive API documentation for the Cincinnati Museum Chatbot.
 
 ---
 
 ## Overview
 
-[INSERT_API_OVERVIEW - Brief description of what the APIs do and their purpose]
-
----
-
-## Base URL
-
-```
-https://[INSERT_API_ID].execute-api.[INSERT_REGION].amazonaws.com/[INSERT_STAGE]/
-```
-
-> **[PLACEHOLDER]** Replace with your actual API Gateway endpoint after deployment
-
-**Example:**
-```
-https://xxxxxxxxxx.execute-api.us-east-1.amazonaws.com/prod/
-```
-
+The Cincinnati Museum Chatbot API provides endpoints for:
+- **Chat**: Streaming chat interface powered by Amazon Bedrock Knowledge Base
+- **Feedback**: User feedback submission for conversation quality tracking
+- **Users**: Public user registration and admin user management
+- **Admin**: Protected endpoints for dashboard analytics and conversation management
 ---
 
 ## Authentication
 
-[INSERT_AUTHENTICATION_METHOD - Describe how API requests should be authenticated]
+### Public Endpoints (No Authentication Required)
+| Endpoint | Description |
+|----------|-------------|
+| `POST /chat` | Chat with the knowledge base |
+| `POST /feedback` | Submit feedback for a conversation |
+| `POST /users` | Register a new user |
+
+### Protected Endpoints (Cognito Authentication Required)
+All `/admin/*` endpoints require a valid Cognito JWT token.
 
 ### Headers Required
 | Header | Description | Required |
 |--------|-------------|----------|
-| `[INSERT_HEADER_1]` | [INSERT_DESCRIPTION] | Yes/No |
-| `[INSERT_HEADER_2]` | [INSERT_DESCRIPTION] | Yes/No |
 | `Content-Type` | `application/json` | Yes |
+| `Authorization` | Cognito JWT token (for admin endpoints) | Admin only |
 
 ---
 
-## 1) [INSERT_API_GROUP_1_NAME - e.g., "Chat Endpoints"]
+## 1) Chat Endpoints
 
-[INSERT_GROUP_DESCRIPTION - Brief description of this group of endpoints]
+Streaming chat interface powered by Amazon Bedrock Knowledge Base with Server-Sent Events (SSE).
 
 ---
 
-#### POST /[INSERT_ENDPOINT_1] — [INSERT_BRIEF_DESCRIPTION]
+#### POST /chat — Stream chat response from Knowledge Base
 
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
+- **Purpose**: Send a query to the museum knowledge base and receive a streaming response with citations.
 
 - **Request body**:
 ```json
 {
-  "[INSERT_FIELD_1]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]",
-  "[INSERT_FIELD_2]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]",
-  "[INSERT_FIELD_3]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
+  "query": "string (required) - The user's question",
+  "sessionId": "string (optional) - Session ID for conversation continuity",
+  "numberOfResults": "number (optional, default: 5) - Number of knowledge base results to retrieve",
+  "language": "string (optional, default: 'en') - Response language ('en' or 'es')"
 }
 ```
 
 - **Example request**:
 ```json
 {
-  "[INSERT_FIELD_1]": "[INSERT_EXAMPLE_VALUE]",
-  "[INSERT_FIELD_2]": "[INSERT_EXAMPLE_VALUE]"
+  "query": "What exhibits are currently showing at the museum?",
+  "sessionId": "abc123-def456",
+  "numberOfResults": 5,
+  "language": "en"
+}
+```
+
+- **Response**: Server-Sent Events (SSE) stream with `Content-Type: text/event-stream`
+
+- **Event Types** (in order):
+
+| Event | Data Schema | Description |
+|-------|-------------|-------------|
+| `conversationId` | `{ "conversationId": "string" }` | Unique ID for this Q&A pair (for feedback) |
+| `sessionId` | `{ "sessionId": "string" }` | Bedrock session ID for conversation continuity |
+| `sessionExpired` | `{ "message": "string" }` | Sent if previous session was invalid |
+| `text` | `{ "text": "string" }` | Streamed text chunks (multiple events) |
+| `citations` | `{ "citations": Citation[] }` | Array of citations (sent once at end) |
+| `guardrail` | `{ "action": "string" }` | Guardrail action if triggered |
+| `done` | `{ "status": "complete", "conversationId": "string", "responseTimeMs": number }` | Stream completion |
+| `error` | `{ "error": "string" }` | Error message if request fails |
+
+- **Citation Schema**:
+```json
+{
+  "retrievedReferences": [
+    {
+      "content": {
+        "text": "string - Extracted text content"
+      },
+      "location": {
+        "type": "S3 | WEB",
+        "url": "string - Public HTTPS URL"
+      },
+      "metadata": {}
+    }
+  ]
+}
+```
+
+- **Example SSE stream**:
+```
+event: conversationId
+data: {"conversationId": "550e8400-e29b-41d4-a716-446655440000"}
+
+event: sessionId
+data: {"sessionId": "bedrock-session-id"}
+
+event: text
+data: {"text": "The museum currently has "}
+
+event: text
+data: {"text": "several exciting exhibits..."}
+
+event: citations
+data: {"citations": [{"retrievedReferences": [...]}]}
+
+event: done
+data: {"status": "complete", "conversationId": "550e8400-e29b-41d4-a716-446655440000", "responseTimeMs": 2340}
+```
+
+- **Status codes**:
+  - `200 OK` - Stream started successfully
+  - `400 Bad Request` - Missing required `query` parameter
+  - `500 Internal Server Error` - Bedrock or Lambda error
+
+---
+
+## 2) Feedback Endpoints
+
+Submit user feedback for conversation quality tracking.
+
+---
+
+#### POST /feedback — Submit feedback for a conversation
+
+- **Purpose**: Record positive or negative feedback for a specific conversation.
+
+- **Request body**:
+```json
+{
+  "conversationId": "string (required) - UUID of the conversation",
+  "feedback": "string (required) - 'pos' | 'neg' | 'positive' | 'negative'"
+}
+```
+
+- **Example request**:
+```json
+{
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "feedback": "pos"
 }
 ```
 
 - **Response**:
 ```json
 {
-  "[INSERT_RESPONSE_FIELD_1]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]",
-  "[INSERT_RESPONSE_FIELD_2]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
-}
-```
-
-- **Example response**:
-```json
-{
-  "[INSERT_RESPONSE_FIELD_1]": "[INSERT_EXAMPLE_VALUE]",
-  "[INSERT_RESPONSE_FIELD_2]": "[INSERT_EXAMPLE_VALUE]"
+  "success": true,
+  "conversationId": "string",
+  "feedback": "pos | neg"
 }
 ```
 
 - **Status codes**:
-  - `200 OK` - [INSERT_SUCCESS_DESCRIPTION]
-  - `400 Bad Request` - [INSERT_ERROR_DESCRIPTION]
-  - `500 Internal Server Error` - [INSERT_ERROR_DESCRIPTION]
+  - `200 OK` - Feedback recorded successfully
+  - `400 Bad Request` - Missing or invalid parameters
+  - `404 Not Found` - Conversation not found
+  - `500 Internal Server Error` - Database error
 
 ---
 
-#### GET /[INSERT_ENDPOINT_2] — [INSERT_BRIEF_DESCRIPTION]
+## 3) User Endpoints
 
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
-
-- **Query parameters**:
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `[INSERT_PARAM_1]` | [INSERT_TYPE] | Yes/No | [INSERT_DESCRIPTION] |
-| `[INSERT_PARAM_2]` | [INSERT_TYPE] | Yes/No | [INSERT_DESCRIPTION] |
-
-- **Example request**:
-```
-GET /[INSERT_ENDPOINT]?[INSERT_PARAM_1]=[INSERT_VALUE]&[INSERT_PARAM_2]=[INSERT_VALUE]
-```
-
-- **Response**:
-```json
-{
-  "[INSERT_RESPONSE_FIELD]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
-}
-```
+Public user registration and admin user management.
 
 ---
 
-## 2) [INSERT_API_GROUP_2_NAME - e.g., "Document Endpoints"]
+#### POST /users — Create a new user (Public)
 
-[INSERT_GROUP_DESCRIPTION]
-
----
-
-#### POST /[INSERT_ENDPOINT_3] — [INSERT_BRIEF_DESCRIPTION]
-
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
+- **Purpose**: Register a new user from the chatbot interface.
 
 - **Request body**:
 ```json
 {
-  "[INSERT_FIELD]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
+  "userId": "string (required) - Unique user identifier",
+  "firstName": "string (optional)",
+  "lastName": "string (optional)",
+  "email": "string (optional)",
+  "phoneNumber": "string (optional)",
+  "supportQuestion": "string (optional) - User's support inquiry",
+  "createdAt": "string (optional) - ISO timestamp, auto-generated if not provided"
+}
+```
+
+- **Example request**:
+```json
+{
+  "userId": "user-12345",
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@example.com",
+  "supportQuestion": "I need help with membership"
 }
 ```
 
 - **Response**:
 ```json
 {
-  "[INSERT_RESPONSE_FIELD]": "[INSERT_TYPE] - [INSERT_DESCRIPTION]"
+  "message": "User created successfully",
+  "user": {
+    "userId": "string",
+    "createdAt": "string (ISO timestamp)",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string",
+    "phoneNumber": "string",
+    "supportQuestion": "string"
+  }
 }
 ```
 
+- **Status codes**:
+  - `201 Created` - User created successfully
+  - `400 Bad Request` - Missing userId
+  - `500 Internal Server Error` - Database error
+
 ---
 
-#### DELETE /[INSERT_ENDPOINT_4] — [INSERT_BRIEF_DESCRIPTION]
+#### GET /admin/users/{userId} — Get user by ID (Protected)
 
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
+- **Purpose**: Retrieve user record(s) by userId.
 
 - **Path parameters**:
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `[INSERT_PARAM]` | [INSERT_TYPE] | [INSERT_DESCRIPTION] |
+| `userId` | string | User's unique identifier |
 
-- **Response**:
+- **Query parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `createdAt` | string | No | ISO timestamp to get specific record |
+
+- **Response** (without createdAt):
 ```json
 {
-  "message": "string - Success/error message"
+  "users": [
+    {
+      "userId": "string",
+      "createdAt": "string",
+      "firstName": "string",
+      "lastName": "string",
+      "email": "string",
+      "phoneNumber": "string",
+      "supportQuestion": "string"
+    }
+  ],
+  "count": 1
+}
+```
+
+- **Response** (with createdAt):
+```json
+{
+  "user": {
+    "userId": "string",
+    "createdAt": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string"
+  }
 }
 ```
 
 ---
 
-## 3) [INSERT_API_GROUP_3_NAME - e.g., "Admin Endpoints"]
+#### PUT /admin/users/{userId} — Update user (Protected)
 
-[INSERT_GROUP_DESCRIPTION]
+- **Purpose**: Update an existing user record.
+
+- **Path parameters**:
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `userId` | string | User's unique identifier |
+
+- **Request body**:
+```json
+{
+  "createdAt": "string (required) - ISO timestamp of the record to update",
+  "firstName": "string (optional)",
+  "lastName": "string (optional)",
+  "email": "string (optional)",
+  "phoneNumber": "string (optional)",
+  "supportQuestion": "string (optional)"
+}
+```
+
+- **Response**:
+```json
+{
+  "message": "User updated successfully",
+  "user": {
+    "userId": "string",
+    "createdAt": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string"
+  }
+}
+```
+
+- **Status codes**:
+  - `200 OK` - User updated successfully
+  - `400 Bad Request` - Missing createdAt or no fields to update
+  - `404 Not Found` - User record not found
+  - `500 Internal Server Error` - Database error
 
 ---
 
-#### [INSERT_HTTP_METHOD] /[INSERT_ENDPOINT] — [INSERT_BRIEF_DESCRIPTION]
+#### DELETE /admin/users/{userId} — Delete user (Protected)
 
-- **Purpose**: [INSERT_DETAILED_PURPOSE]
+- **Purpose**: Delete a user record.
 
-- **Request/Response**: [INSERT_DETAILS]
+- **Path parameters**:
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `userId` | string | User's unique identifier |
+
+- **Response**:
+```json
+{
+  "success": true,
+  "message": "User {userId} deleted successfully"
+}
+```
+
+- **Status codes**:
+  - `200 OK` - User deleted successfully
+  - `400 Bad Request` - Missing userId
+  - `404 Not Found` - User not found
+  - `500 Internal Server Error` - Database error
+
+---
+
+## 4) Admin Endpoints (Protected)
+
+All admin endpoints require Cognito authentication via `Authorization` header.
+
+---
+
+#### GET /admin/stats — Get dashboard statistics
+
+- **Purpose**: Retrieve conversation statistics for the admin dashboard.
+
+- **Query parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `days` | number | No | Number of days to query (default: 7) |
+| `startDate` | string | No | Start date (YYYY-MM-DD format) |
+| `endDate` | string | No | End date (YYYY-MM-DD format) |
+
+- **Example request**:
+```
+GET /admin/stats?startDate=2025-01-01&endDate=2025-01-07
+```
+
+- **Response**:
+```json
+{
+  "totalConversations": 150,
+  "conversationsToday": 23,
+  "totalFeedback": 45,
+  "positiveFeedback": 38,
+  "negativeFeedback": 7,
+  "noFeedback": 105,
+  "satisfactionRate": 84.4,
+  "avgResponseTimeMs": 2340,
+  "conversationsByDay": [
+    {
+      "date": "2025-01-01",
+      "count": 20,
+      "dayName": "Wed",
+      "label": "1"
+    }
+  ],
+  "period": {
+    "days": 7,
+    "startDate": "2025-01-01",
+    "endDate": "2025-01-07"
+  }
+}
+```
+
+---
+
+#### GET /admin/conversations — Get conversation list
+
+- **Purpose**: Retrieve paginated list of conversations with filtering.
+
+- **Query parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `feedback` | string | No | Filter by feedback: `pos`, `neg`, or `none` |
+| `startDate` | string | No | Start date (YYYY-MM-DD) |
+| `endDate` | string | No | End date (YYYY-MM-DD) |
+| `limit` | number | No | Items per page (default: 20) |
+| `offset` | number | No | Number of items to skip (default: 0) |
+
+- **Example request**:
+```
+GET /admin/conversations?feedback=neg&limit=10&offset=0
+```
+
+- **Response**:
+```json
+{
+  "conversations": [
+    {
+      "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+      "sessionId": "session-abc123",
+      "timestamp": "2025-01-05T10:30:00.000Z",
+      "date": "2025-01-05",
+      "question": "What are the museum hours?...",
+      "answerPreview": "The museum is open Tuesday through Sunday...",
+      "feedback": "pos",
+      "responseTimeMs": 2340,
+      "citationCount": 3,
+      "language": "en"
+    }
+  ],
+  "count": 10,
+  "total": 150,
+  "offset": 0,
+  "limit": 10,
+  "hasMore": true
+}
+```
+
+---
+
+#### GET /admin/conversations/{conversationId} — Get conversation details
+
+- **Purpose**: Retrieve full details of a single conversation.
+
+- **Path parameters**:
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `conversationId` | string | UUID of the conversation |
+
+- **Response**:
+```json
+{
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "sessionId": "session-abc123",
+  "timestamp": "2025-01-05T10:30:00.000Z",
+  "date": "2025-01-05",
+  "question": "What are the museum hours?",
+  "answer": "The museum is open Tuesday through Sunday from 10am to 5pm...",
+  "citations": [
+    {
+      "retrievedReferences": [
+        {
+          "content": { "text": "..." },
+          "location": { "type": "WEB", "url": "https://..." },
+          "metadata": {}
+        }
+      ]
+    }
+  ],
+  "citationCount": 3,
+  "feedback": "pos",
+  "feedbackTs": "2025-01-05T10:35:00.000Z",
+  "responseTimeMs": 2340,
+  "modelId": "global.amazon.nova-2-lite-v1:0",
+  "language": "en",
+  "questionLength": 28,
+  "answerLength": 245
+}
+```
+
+- **Status codes**:
+  - `200 OK` - Success
+  - `400 Bad Request` - Missing conversationId
+  - `404 Not Found` - Conversation not found
+
+---
+
+#### GET /admin/feedback-summary — Get feedback summary
+
+- **Purpose**: Retrieve feedback statistics and recent negative feedback.
+
+- **Query parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `days` | number | No | Number of days (default: 30) |
+| `startDate` | string | No | Start date (YYYY-MM-DD) |
+| `endDate` | string | No | End date (YYYY-MM-DD) |
+
+- **Response**:
+```json
+{
+  "summary": {
+    "positive": 38,
+    "negative": 7,
+    "noFeedback": 105,
+    "total": 150,
+    "satisfactionRate": 84.4
+  },
+  "recentNegative": [
+    {
+      "conversationId": "uuid",
+      "timestamp": "2025-01-05T10:30:00.000Z",
+      "question": "...",
+      "answerPreview": "...",
+      "feedbackTs": "2025-01-05T10:35:00.000Z"
+    }
+  ],
+  "period": {
+    "days": 30,
+    "startDate": "2024-12-06",
+    "endDate": "2025-01-05"
+  }
+}
+```
+
+---
+
+#### GET /admin/users — List all users
+
+- **Purpose**: Retrieve paginated list of all registered users.
+
+- **Query parameters**:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | number | No | Items per page (default: 20, max: 100) |
+| `offset` | number | No | Number of items to skip (default: 0) |
+
+- **Response**:
+```json
+{
+  "users": [
+    {
+      "id": "user-12345",
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john.doe@example.com",
+      "phoneNumber": "+1234567890",
+      "supportQuestion": "I need help with membership",
+      "createdAt": "2025-01-05T10:30:00.000Z"
+    }
+  ],
+  "total": 50,
+  "offset": 0,
+  "limit": 20,
+  "hasMore": true
+}
+```
 
 ---
 
 ## Response Format
-
-All API responses follow this general structure:
 
 ### Success Response
 ```json
 {
   "statusCode": 200,
   "body": {
-    "[INSERT_DATA_FIELD]": "[INSERT_DATA]"
+    "data": "..."
   }
 }
 ```
@@ -187,10 +570,9 @@ All API responses follow this general structure:
 ### Error Response
 ```json
 {
-  "statusCode": "[INSERT_ERROR_CODE]",
-  "error": {
-    "message": "[INSERT_ERROR_MESSAGE]",
-    "code": "[INSERT_ERROR_CODE_STRING]"
+  "statusCode": 400,
+  "body": {
+    "error": "Error message description"
   }
 }
 ```
@@ -201,39 +583,83 @@ All API responses follow this general structure:
 
 | Code | Name | Description |
 |------|------|-------------|
-| `400` | Bad Request | [INSERT_DESCRIPTION] |
-| `401` | Unauthorized | [INSERT_DESCRIPTION] |
-| `403` | Forbidden | [INSERT_DESCRIPTION] |
-| `404` | Not Found | [INSERT_DESCRIPTION] |
-| `429` | Too Many Requests | [INSERT_DESCRIPTION] |
-| `500` | Internal Server Error | [INSERT_DESCRIPTION] |
+| `400` | Bad Request | Invalid request parameters or missing required fields |
+| `401` | Unauthorized | Missing or invalid Cognito JWT token |
+| `403` | Forbidden | Valid token but insufficient permissions |
+| `404` | Not Found | Requested resource does not exist |
+| `405` | Method Not Allowed | HTTP method not supported for endpoint |
+| `500` | Internal Server Error | Server-side error (Lambda, DynamoDB, Bedrock) |
 
 ---
 
 ## Rate Limiting
 
-[INSERT_RATE_LIMITING_DETAILS - Describe any rate limits on the API]
+Rate limiting is managed by API Gateway and AWS service quotas:
 
-- **Requests per second**: [INSERT_LIMIT]
-- **Requests per day**: [INSERT_LIMIT]
-- **Burst limit**: [INSERT_LIMIT]
+- **API Gateway**: Default throttling applies
+- **Bedrock Knowledge Base**: Subject to AWS Bedrock quotas
+- **DynamoDB**: On-demand capacity mode (auto-scaling)
 
 ---
 
 ## SDK / Client Examples
 
-### JavaScript/TypeScript
+### JavaScript/TypeScript (Streaming Chat)
 ```typescript
-// [INSERT_EXAMPLE_CODE]
-const response = await fetch('[INSERT_API_URL]/[INSERT_ENDPOINT]', {
+const response = await fetch('https://your-api.execute-api.us-east-1.amazonaws.com/prod/chat', {
   method: 'POST',
   headers: {
-    'Content-Type': 'application/json',
-    '[INSERT_AUTH_HEADER]': '[INSERT_AUTH_VALUE]'
+    'Content-Type': 'application/json'
   },
   body: JSON.stringify({
-    [INSERT_REQUEST_BODY]
+    query: 'What exhibits are showing?',
+    language: 'en'
   })
+});
+
+const reader = response.body?.getReader();
+const decoder = new TextDecoder();
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+  
+  const chunk = decoder.decode(value);
+  const lines = chunk.split('\n');
+  
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const data = JSON.parse(line.slice(6));
+      console.log(data);
+    }
+  }
+}
+```
+
+### JavaScript/TypeScript (Admin API with Cognito)
+```typescript
+import { CognitoIdentityProviderClient, InitiateAuthCommand } from '@aws-sdk/client-cognito-identity-provider';
+
+// Get Cognito token
+const cognitoClient = new CognitoIdentityProviderClient({ region: 'us-east-1' });
+const authResponse = await cognitoClient.send(new InitiateAuthCommand({
+  AuthFlow: 'USER_PASSWORD_AUTH',
+  ClientId: 'your-client-id',
+  AuthParameters: {
+    USERNAME: 'admin@example.com',
+    PASSWORD: 'your-password'
+  }
+}));
+
+const idToken = authResponse.AuthenticationResult?.IdToken;
+
+// Call admin API
+const response = await fetch('https://your-api.execute-api.us-east-1.amazonaws.com/prod/admin/stats', {
+  method: 'GET',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': idToken
+  }
 });
 
 const data = await response.json();
@@ -241,32 +667,72 @@ const data = await response.json();
 
 ### Python
 ```python
-# [INSERT_EXAMPLE_CODE]
 import requests
 
+# Streaming chat
 response = requests.post(
-    '[INSERT_API_URL]/[INSERT_ENDPOINT]',
-    headers={
-        'Content-Type': 'application/json',
-        '[INSERT_AUTH_HEADER]': '[INSERT_AUTH_VALUE]'
-    },
-    json={
-        '[INSERT_FIELD]': '[INSERT_VALUE]'
-    }
+    'https://your-api.execute-api.us-east-1.amazonaws.com/prod/chat',
+    headers={'Content-Type': 'application/json'},
+    json={'query': 'What exhibits are showing?'},
+    stream=True
 )
 
-data = response.json()
+for line in response.iter_lines():
+    if line:
+        decoded = line.decode('utf-8')
+        if decoded.startswith('data: '):
+            print(decoded[6:])
 ```
 
 ### cURL
 ```bash
-curl -X POST '[INSERT_API_URL]/[INSERT_ENDPOINT]' \
+# Chat endpoint
+curl -X POST 'https://your-api.execute-api.us-east-1.amazonaws.com/prod/chat' \
   -H 'Content-Type: application/json' \
-  -H '[INSERT_AUTH_HEADER]: [INSERT_AUTH_VALUE]' \
-  -d '{
-    "[INSERT_FIELD]": "[INSERT_VALUE]"
-  }'
+  -d '{"query": "What are the museum hours?"}'
+
+# Submit feedback
+curl -X POST 'https://your-api.execute-api.us-east-1.amazonaws.com/prod/feedback' \
+  -H 'Content-Type: application/json' \
+  -d '{"conversationId": "uuid-here", "feedback": "pos"}'
+
+# Admin endpoint (with Cognito token)
+curl -X GET 'https://your-api.execute-api.us-east-1.amazonaws.com/prod/admin/stats' \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: your-cognito-id-token'
 ```
+
+---
+
+## DynamoDB Table Schemas
+
+### Users Table
+| Attribute | Type | Key | Description |
+|-----------|------|-----|-------------|
+| `userId` | String | Partition Key | Unique user identifier |
+| `createdAt` | String | Sort Key | ISO timestamp |
+| `firstName` | String | - | User's first name |
+| `lastName` | String | - | User's last name |
+| `email` | String | - | User's email |
+| `phoneNumber` | String | - | User's phone number |
+| `supportQuestion` | String | - | Support inquiry text |
+
+### Conversation History Table
+| Attribute | Type | Key | Description |
+|-----------|------|-----|-------------|
+| `conversationId` | String | Partition Key | UUID for the Q&A pair |
+| `timestamp` | String | Sort Key | ISO timestamp |
+| `sessionId` | String | GSI-PK | Session identifier |
+| `date` | String | GSI-PK | Date (YYYY-MM-DD) for analytics |
+| `feedback` | String | GSI-PK | `pos`, `neg`, or null |
+| `question` | String | - | User's question |
+| `answer` | String | - | Bot's response |
+| `citations` | String | - | JSON array of citations |
+| `citationCount` | Number | - | Number of citations |
+| `responseTimeMs` | Number | - | Response generation time |
+| `modelId` | String | - | Bedrock model used |
+| `knowledgeBaseId` | String | - | Knowledge base ID |
+| `language` | String | - | Response language |
 
 ---
 
@@ -274,13 +740,13 @@ curl -X POST '[INSERT_API_URL]/[INSERT_ENDPOINT]' \
 
 | Version | Date | Changes |
 |---------|------|---------|
-| [INSERT_VERSION] | [INSERT_DATE] | [INSERT_CHANGES] |
+| 1.0.0 | 2025-01-05 | Initial API documentation |
 
 ---
 
 ## Support
 
 For API-related issues or questions:
-- [INSERT_SUPPORT_CHANNEL]
-- [INSERT_DOCUMENTATION_LINK]
-
+- Review the [Deployment Guide](./deploymentGuide.md) for setup instructions
+- Check the [Architecture Deep Dive](./architectureDeepDive.md) for system design details
+- See the [User Guide](./userGuide.md) for frontend usage

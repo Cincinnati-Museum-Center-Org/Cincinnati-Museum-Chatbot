@@ -448,6 +448,8 @@ export class MuseumChatbot extends cdk.Stack {
     // - Main website: cincymuseum.org
     // - Collections: searchcollections.cincymuseum.org
     // - Philanthropy: supportcmc.org
+    // - Event processing: cincymuseum.org/event-processing
+    // - Podcast feed: feed.podbean.com/cincinnatimuseumcenter
     const webCrawlerDataSource = new bedrock.CfnDataSource(this, "MuseumWebCrawlerDataSource", {
       name: "MuseumWebsites-v2",
       description: "Web crawler for Museum websites including main site, collections, and philanthropy",
@@ -461,6 +463,8 @@ export class MuseumChatbot extends cdk.Stack {
                 { url: "https://www.cincymuseum.org/#gsc.tab=0" },
                 // { url: "https://searchcollections.cincymuseum.org" },
                 { url: "https://supportcmc.org/" },
+                { url: "https://www.cincymuseum.org/event-processing/filename.html" },
+                { url: "https://feed.podbean.com/cincinnatimuseumcenter/feed.xml" },
               ],
             },
           },

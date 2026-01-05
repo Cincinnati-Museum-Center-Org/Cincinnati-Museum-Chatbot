@@ -1,263 +1,292 @@
 # Deployment Guide
 
-This guide provides step-by-step instructions for deploying [INSERT_PROJECT_NAME].
+This guide provides step-by-step instructions for deploying the Cincinnati Museum Chatbot.
 
 ---
 
-## Table of Contents
+## Common Prerequisites
 
-- [Deployment Guide](#deployment-guide)
-  - [Requirements](#requirements)
-  - [Pre-Deployment](#pre-deployment)
-    - [AWS Account Setup](#aws-account-setup)
-    - [CLI Tools Installation](#cli-tools-installation)
-    - [Environment Configuration](#environment-configuration)
-  - [Deployment](#deployment)
-    - [Backend Deployment](#backend-deployment)
-    - [Frontend Deployment](#frontend-deployment)
-  - [Post-Deployment Verification](#post-deployment-verification)
-  - [Troubleshooting](#troubleshooting)
+### 1. Fork the Repository
 
----
+Fork this repository to your own GitHub account (required for deployment and CI/CD):
 
-## Requirements
+1. Navigate to the repository on GitHub
+2. Click the **"Fork"** button in the top right corner
+3. Select your GitHub account as the destination
+4. Wait for the forking process to complete
+5. You'll now have your own copy at `https://github.com/YOUR-USERNAME/Cincinnati-Museum-Chatbot`
 
-Before you deploy, you must have the following:
+### 2. Obtain a GitHub Personal Access Token
 
-### Accounts
-- [ ] **AWS Account** - [Create an AWS Account](https://aws.amazon.com/)
-- [ ] [INSERT_ADDITIONAL_ACCOUNT_REQUIREMENTS]
+A GitHub personal access token with repo permissions is needed for CDK deployment:
 
-### CLI Tools
-- [ ] **AWS CLI** (v2.x) - [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- [ ] **Node.js** (v18.x or later) - [Install Node.js](https://nodejs.org/)
-- [ ] **npm** (v9.x or later) - Included with Node.js
-- [ ] **AWS CDK** (v2.x) - Install via `npm install -g aws-cdk`
-- [ ] [INSERT_ADDITIONAL_CLI_TOOLS]
+1. Go to **GitHub Settings > Developer Settings > Personal Access Tokens > Tokens (classic)**
+2. Click **"Generate new token (classic)"**
+3. Give the token a descriptive name (e.g., "CMC Chatbot Deployment")
+4. Select the following scopes:
+   - `repo` (Full control of private repositories)
+   - `admin:repo_hook` (Full control of repository hooks)
+5. Click **"Generate token"** and save the token securely
 
-### Access Permissions
-- [ ] AWS IAM user/role with permissions for:
-  - CloudFormation
-  - Lambda
-  - API Gateway
-  - S3
-  - [INSERT_ADDITIONAL_AWS_SERVICES]
-- [ ] [INSERT_ADDITIONAL_PERMISSIONS]
+> **Important**: Save this token immediately - you won't be able to see it again!
 
-### Software Dependencies
-- [ ] Git - [Install Git](https://git-scm.com/downloads)
-- [ ] [INSERT_ADDITIONAL_DEPENDENCIES]
+For detailed instructions, see: [GitHub Personal Access Tokens Documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)
 
----
+### 4. AWS Account Permissions
 
-## Pre-Deployment
+Ensure your AWS account has permissions to create and manage the following resources:
 
-### AWS Account Setup
-
-1. **Configure AWS CLI**
-   ```bash
-   aws configure
-   ```
-   Enter your:
-   - AWS Access Key ID
-   - AWS Secret Access Key
-   - Default region: `us-east-1` (or [INSERT_PREFERRED_REGION])
-   - Default output format: `json`
-
-2. **Bootstrap CDK** (first-time CDK users only)
-   ```bash
-   cdk bootstrap aws://[ACCOUNT_ID]/[REGION]
-   ```
-   > **[PLACEHOLDER]** Replace `[ACCOUNT_ID]` with your AWS account ID and `[REGION]` with your deployment region
-
-### CLI Tools Installation
-
-1. **Install Node.js dependencies for backend**
-   ```bash
-   cd backend
-   npm install
-   ```
-
-2. **Install Node.js dependencies for frontend**
-   ```bash
-   cd frontend
-   npm install
-   ```
-
-3. **Install AWS CDK globally** (if not already installed)
-   ```bash
-   npm install -g aws-cdk
-   ```
-
-### Environment Configuration
-
-1. **Create environment configuration file**
-   
-   [INSERT_ENV_CONFIGURATION_INSTRUCTIONS]
-   
-   ```bash
-   # Example: Create .env file
-   cp .env.example .env
-   ```
-
-2. **Configure required environment variables**
-   
-   [INSERT_ENV_VARIABLES_TABLE]
-   
-   | Variable | Description | Example |
-   |----------|-------------|---------|
-   | `[INSERT_VAR_1]` | [INSERT_DESCRIPTION] | [INSERT_EXAMPLE] |
-   | `[INSERT_VAR_2]` | [INSERT_DESCRIPTION] | [INSERT_EXAMPLE] |
-   | `[INSERT_VAR_3]` | [INSERT_DESCRIPTION] | [INSERT_EXAMPLE] |
-
-3. **[INSERT_ADDITIONAL_CONFIGURATION_STEPS]**
-   
-   > **Important**: [INSERT_IMPORTANT_NOTES]
+- CloudFormation
+- Lambda
+- API Gateway
+- S3
+- DynamoDB
+- Bedrock (Knowledge Bases, Agents)
+- OpenSearch Serverless
+- Cognito
+- Amplify
+- Secrets Manager
+- IAM Roles and Policies
+- CloudWatch Logs
 
 ---
 
-## Deployment
+## Deployment Using AWS CodeBuild and CloudShell
 
-### Backend Deployment
+This is the **recommended deployment method**.
 
-1. **Navigate to the backend directory**
-   ```bash
-   cd backend
-   ```
+### Prerequisites
 
-2. **Synthesize the CloudFormation template** (optional, for review)
-   ```bash
-   cdk synth
-   ```
+- Access to AWS CloudShell
+- AWS account with CodeBuild permissions
 
-3. **Deploy the backend stack**
-   ```bash
-   cdk deploy
-   ```
-   
-   When prompted:
-   - Review the IAM changes
-   - Type `y` to confirm deployment
+### Deployment Steps
 
-4. **Note the outputs**
-   
-   After deployment, note down the following outputs:
-   - **API Endpoint**: `[INSERT_OUTPUT_NAME]`
-   - **[INSERT_ADDITIONAL_OUTPUT]**: [INSERT_DESCRIPTION]
-   
-   > **Important**: Save these values as they will be needed for frontend configuration
+#### 1. Open AWS CloudShell
 
-### Frontend Deployment
+1. Log in to the AWS Console
+2. Click the **CloudShell icon** in the AWS Console navigation bar (terminal icon)
+3. Wait for the CloudShell environment to initialize
 
-1. **Navigate to the frontend directory**
-   ```bash
-   cd frontend
-   ```
+#### 2. Clone Your Forked Repository
 
-2. **Configure the frontend environment**
-   
-   [INSERT_FRONTEND_CONFIG_INSTRUCTIONS]
-   
-   ```bash
-   # Example: Update API endpoint
-   echo "NEXT_PUBLIC_API_URL=[YOUR_API_ENDPOINT]" >> .env.local
-   ```
+```bash
+git clone https://github.com/YOUR-USERNAME/Cincinnati-Museum-Chatbot
+cd Cincinnati-Museum-Chatbot/
+```
 
-3. **Build the frontend**
-   ```bash
-   npm run build
-   ```
+> **Important**: Replace `YOUR-USERNAME` with your actual GitHub username.
 
-4. **Deploy the frontend**
-   
-   [INSERT_FRONTEND_DEPLOYMENT_METHOD]
-   
-   **Option A: Deploy to Vercel**
-   ```bash
-   npx vercel --prod
-   ```
-   
-   **Option B: Deploy to AWS Amplify**
-   ```bash
-   [INSERT_AMPLIFY_COMMANDS]
-   ```
-   
-   **Option C: [INSERT_ALTERNATIVE_DEPLOYMENT]**
-   ```bash
-   [INSERT_COMMANDS]
-   ```
+#### 3. Run the Deployment Script
+
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
+The script will prompt you for:
+
+| Prompt | Description | Example |
+|--------|-------------|---------|
+| GitHub repository URL | Your forked repo URL | `https://github.com/yourname/Cincinnati-Museum-Chatbot` |
+| GitHub Token | Personal access token from prerequisites | `ghp_xxxxxxxxxxxx` |
+| Action | Deploy or destroy | `deploy` |
+
+The script will:
+1. Create an IAM service role for CodeBuild
+2. Create a CodeBuild project
+3. Start the build which deploys all infrastructure via CDK
+
+#### 4. Monitor the Build
+
+After starting the build:
+
+1. Go to **AWS Console > CodeBuild > Build projects**
+2. Click on the project name (e.g., `CincyMuseum-20250105123456`)
+3. Click on the running build to view logs
+4. Wait for the build to complete (typically 5-15 minutes)
 
 ---
 
-## Post-Deployment Verification
+## Manual CDK Deployment
 
-### Verify Backend Deployment
+Use this method if you prefer to deploy from your local machine.
 
-1. **Check CloudFormation stack status**
-   ```bash
-   aws cloudformation describe-stacks --stack-name [INSERT_STACK_NAME]
-   ```
-   
-   Expected status: `CREATE_COMPLETE` or `UPDATE_COMPLETE`
+### Prerequisites
 
-2. **Test API endpoint**
-   ```bash
-   curl -X GET [INSERT_API_ENDPOINT]/[INSERT_TEST_PATH]
-   ```
-   
-   Expected response: [INSERT_EXPECTED_RESPONSE]
+- **AWS CLI** (v2.x) - [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- **Node.js** (v18.x or later) - [Download Node.js](https://nodejs.org/)
+- **AWS CDK** (v2.x) - Install via `npm install -g aws-cdk`
+- **Docker** - [Install Docker](https://docs.docker.com/get-docker/)
 
-3. **Check Lambda functions**
-   ```bash
-   aws lambda list-functions --query "Functions[?contains(FunctionName, '[INSERT_FUNCTION_PREFIX]')]"
-   ```
+### Deployment Steps
 
-### Verify Frontend Deployment
+#### 1. Clone the Repository
 
-1. **Access the application**
-   
-   Navigate to: `[INSERT_FRONTEND_URL]`
+```bash
+git clone https://github.com/YOUR-USERNAME/Cincinnati-Museum-Chatbot
+cd Cincinnati-Museum-Chatbot/
+```
 
-2. **Test basic functionality**
-   - [ ] [INSERT_TEST_CASE_1]
-   - [ ] [INSERT_TEST_CASE_2]
-   - [ ] [INSERT_TEST_CASE_3]
+#### 2. Configure AWS CLI
+
+```bash
+aws configure
+```
+
+Enter your:
+- AWS Access Key ID
+- AWS Secret Access Key
+- Default region: `us-east-1` (recommended)
+- Default output format: `json`
+
+#### 3. Install Dependencies
+
+```bash
+cd backend
+npm install
+```
+
+#### 4. Bootstrap CDK (First-time only)
+
+```bash
+cdk bootstrap \
+  -c githubToken=YOUR_GITHUB_TOKEN \
+  -c githubOwner=YOUR_GITHUB_USERNAME \
+  -c githubRepo=Cincinnati-Museum-Chatbot
+```
+
+#### 5. Deploy the Stack
+
+```bash
+cdk deploy \
+  -c githubToken=YOUR_GITHUB_TOKEN \
+  -c githubOwner=YOUR_GITHUB_USERNAME \
+  -c githubRepo=Cincinnati-Museum-Chatbot
+```
+
+When prompted, review the IAM changes and type `y` to confirm.
+
+---
+
+## Post-Deployment Steps
+
+### 1. Upload Documents to S3
+
+Upload your documents (PDFs, images, text files) to the S3 data bucket:
+
+```bash
+# Get the bucket name from CDK outputs (MuseumDataBucketName)
+
+# Upload to public folder (files will be accessible in citations)
+aws s3 cp your-document.pdf s3://YOUR-BUCKET-NAME/public/documents/
+
+# Upload images
+aws s3 cp your-image.jpg s3://YOUR-BUCKET-NAME/public/images/
+
+# Upload entire folder
+aws s3 sync ./my-documents/ s3://YOUR-BUCKET-NAME/public/documents/
+```
+
+> **Note**: Files in the `public/` prefix will have their URLs exposed in chat citations. Use the `private/` prefix for documents that should be indexed but not directly linked.
+
+### 2. Sync the Knowledge Base
+
+After uploading documents, sync the Knowledge Base to index your data:
+
+1. Go to **AWS Console > Bedrock > Knowledge bases**
+2. Select the knowledge base created by the stack
+3. Click **"Sync"** for each data source
+4. Wait for sync to complete (status will show "Available")
+
+### 3. Create Admin User in Cognito
+
+Create an admin user for the dashboard:
+
+1. Go to **AWS Console > Cognito > User Pools**
+2. Select the user pool created by the stack (e.g., `MuseumChatbot-AdminPool`)
+3. Click **"Users"** tab > **"Create user"**
+4. Fill in:
+   - Username: admin email address
+   - Email: same email address
+   - Temporary password: a secure password
+5. Click **"Create user"**
+
+The user will reset their password on first login.
+
+### 4. Access the Application
+
+1. Go to **AWS Console > AWS Amplify**
+2. Select the app created by the stack
+3. Click on the **Amplify URL** to access the chatbot
+4. Navigate to `/admin` to access the admin dashboard
+
+---
+
+## CDK Outputs
+
+After deployment, note these important outputs:
+
+| Output | Description |
+|--------|-------------|
+| `AmplifyAppUrl` | Frontend application URL |
+| `ChatApiUrl` | Chat API endpoint |
+| `AdminApiUrl` | Admin API endpoint |
+| `KnowledgeBaseId` | Bedrock Knowledge Base ID |
+| `MuseumDataBucketName` | S3 bucket for uploading documents |
+| `AdminUserPoolId` | Cognito User Pool ID |
+| `AdminUserPoolClientId` | Cognito App Client ID |
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
+### CodeBuild Errors
 
-#### Issue: [INSERT_COMMON_ISSUE_1]
-**Symptoms**: [INSERT_SYMPTOMS]
+**Error**: "Build failed"
+- Check CloudWatch logs for detailed error messages
+- Verify your GitHub token has correct permissions
+- Ensure Bedrock models are enabled in your region
 
-**Solution**:
-```bash
-[INSERT_SOLUTION_COMMANDS]
-```
+### CDK Bootstrap Error
 
-#### Issue: [INSERT_COMMON_ISSUE_2]
-**Symptoms**: [INSERT_SYMPTOMS]
-
-**Solution**:
-[INSERT_SOLUTION_STEPS]
-
-#### Issue: CDK Bootstrap Error
-**Symptoms**: Error message about CDK not being bootstrapped
+**Error**: "This stack uses assets, so the toolkit stack must be deployed"
 
 **Solution**:
 ```bash
-cdk bootstrap aws://[ACCOUNT_ID]/[REGION]
+cdk bootstrap aws://ACCOUNT_ID/REGION \
+  -c githubToken=YOUR_TOKEN \
+  -c githubOwner=YOUR_USERNAME \
+  -c githubRepo=Cincinnati-Museum-Chatbot
 ```
 
-#### Issue: Permission Denied
-**Symptoms**: Access denied errors during deployment
+### Permission Denied
+
+**Error**: Access denied errors during deployment
 
 **Solution**:
 - Verify your AWS credentials are configured correctly
 - Ensure your IAM user/role has the required permissions
 - Check if you're deploying to the correct region
+
+### Knowledge Base Not Responding
+
+**Error**: Chat returns empty or error responses
+
+**Solution**:
+1. Verify the Bedrock knowledge base is properly synced
+2. Check if the S3 bucket contains data files
+3. Ensure the Lambda function has proper IAM permissions
+4. Check CloudWatch logs for the streaming Lambda
+
+### Amplify Build Failed
+
+**Error**: Frontend deployment failed
+
+**Solution**:
+1. Check Amplify build logs in the AWS Console
+2. Verify the GitHub token has repo access
+3. Ensure the `frontend/` directory exists with valid Next.js app
 
 ---
 
@@ -265,18 +294,29 @@ cdk bootstrap aws://[ACCOUNT_ID]/[REGION]
 
 To remove all deployed resources:
 
+### Using deploy.sh
 ```bash
-cd backend
-cdk destroy
+./deploy.sh
+# When prompted, enter: destroy
 ```
 
-> **Warning**: This will delete all resources created by this stack. Make sure to backup any important data before proceeding.
+### Using CDK directly
+```bash
+cd backend
+cdk destroy \
+  -c githubToken=YOUR_TOKEN \
+  -c githubOwner=YOUR_USERNAME \
+  -c githubRepo=Cincinnati-Museum-Chatbot
+```
+
+> **Warning**: This will delete all resources including data in S3 and DynamoDB. Backup important data before proceeding.
 
 ---
 
 ## Next Steps
 
 After successful deployment:
+
 1. Review the [User Guide](./userGuide.md) to learn how to use the application
 2. Check the [API Documentation](./APIDoc.md) for integration details
 3. See the [Modification Guide](./modificationGuide.md) for customization options

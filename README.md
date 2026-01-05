@@ -43,8 +43,6 @@ CincyMuse is a conversational AI assistant designed for the Cincinnati Museum Ce
 
 ![Architecture Diagram](./docs/media/architecture.png)
 
-> **Note:** Please add an architecture diagram at `docs/media/architecture.png`
-
 The application implements a serverless architecture on AWS, combining:
 
 - **Frontend**: Next.js application hosted on AWS Amplify
@@ -58,13 +56,6 @@ For a detailed deep dive into the architecture, see [docs/architectureDeepDive.m
 ## Deployment
 
 For detailed deployment instructions, including prerequisites and step-by-step guides, see [docs/deploymentGuide.md](docs/deploymentGuide.md).
-
-**Quick Start:**
-
-1. Clone the repository and install dependencies
-2. Configure AWS credentials and environment variables
-3. Deploy backend with `cdk deploy`
-4. Frontend auto-deploys via Amplify on push
 
 ## User Guide
 
