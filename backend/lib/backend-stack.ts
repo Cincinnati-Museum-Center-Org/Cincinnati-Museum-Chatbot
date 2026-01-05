@@ -935,10 +935,16 @@ export class MuseumChatbot extends cdk.Stack {
     // Create /admin/users resource under existing /admin
     const adminUsersResource = adminResource.addResource("users");
 
+    // GET /admin/users - List all users (protected) - uses admin-api Lambda
+    adminUsersResource.addMethod("GET", adminIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+
     // Create /admin/users/{userId} resource
     const adminUserByIdResource = adminUsersResource.addResource("{userId}");
 
-    // GET /admin/users/{userId} - Get user(s) (protected)
+    // GET /admin/users/{userId} - Get single user (protected)
     adminUserByIdResource.addMethod("GET", userCrudIntegration, {
       authorizer: adminAuthorizer,
       authorizationType: apigateway.AuthorizationType.COGNITO,
