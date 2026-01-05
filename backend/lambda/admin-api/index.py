@@ -788,6 +788,11 @@ def handler(event, context):
         if "/feedback" in path:
             return submit_feedback(event)
     
+    # DELETE endpoints
+    if http_method == "DELETE":
+        if "/admin/users/" in path:
+            return delete_user(event)
+    
     if http_method == "GET":
         if "/admin/stats" in path:
             return get_stats(event)
@@ -801,6 +806,65 @@ def handler(event, context):
             return get_conversations(event)
     
     return json_response(404, {"error": "Not found"})
+
+
+def delete_user(event: dict) -> dict:
+    """
+    Delete a user by userId.
+    
+    Path: DELETE /admin/users/{userId}
+    """
+    if not USER_TABLE_NAME:
+        return json_response(500, {"error": "USER_TABLE_NAME not configured"})
+    
+    # Extract userId from path
+    path = event.get("path", "")
+    path_params = event.get("pathParameters") or {}
+    user_id = path_params.get("userId")
+    
+    # Fallback: extract from path if pathParameters not available
+    if not user_id and "/admin/users/" in path:
+        user_id = path.split("/admin/users/")[-1].strip("/")
+    
+    if not user_id:
+        return json_response(400, {"error": "Missing userId in path"})
+    
+    print(f"Deleting user: {user_id}")
+    
+    table = dynamodb.Table(USER_TABLE_NAME)
+    
+    try:
+        # First, find the user to get the createdAt (sort key)
+        response = table.query(
+            KeyConditionExpression=Key("userId").eq(user_id),
+            Limit=1
+        )
+        
+        items = response.get("Items", [])
+        if not items:
+            return json_response(404, {"error": "User not found"})
+        
+        user = items[0]
+        created_at = user.get("createdAt")
+        
+        # Delete the user
+        table.delete_item(
+            Key={
+                "userId": user_id,
+                "createdAt": created_at
+            }
+        )
+        
+        print(f"Successfully deleted user: {user_id}")
+        
+        return json_response(200, {
+            "success": True,
+            "message": f"User {user_id} deleted successfully"
+        })
+        
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        return json_response(500, {"error": f"Failed to delete user: {str(e)}"})
 
 
 def submit_feedback(event: dict) -> dict:
