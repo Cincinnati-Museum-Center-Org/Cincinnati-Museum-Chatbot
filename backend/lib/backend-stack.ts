@@ -101,7 +101,6 @@ export class MuseumChatbot extends cdk.Stack {
       autoBuild: true,
       stage: "PRODUCTION",
     });
-
     // Create Amplify app URL constant for CORS
     const amplifyAppUrl = amplifyApp.appId
       ? `https://master.${amplifyApp.appId}.amplifyapp.com`
@@ -608,6 +607,41 @@ export class MuseumChatbot extends cdk.Stack {
     invokeKbStreamLambda.node.addDependency(knowledgeBase);
 
     // ========================================
+    // Lambda Function: User CRUD Operations
+    // ========================================
+
+    // Create IAM role for the User CRUD Lambda function
+    const userCrudLambdaRole = new iam.Role(this, "UserCrudLambdaRole", {
+      assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
+      description: "IAM role for User CRUD Lambda",
+      managedPolicies: [
+        iam.ManagedPolicy.fromManagedPolicyArn(
+          this,
+          "UserCrudLambdaBasicExecution",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        ),
+      ],
+    });
+
+    // Grant permissions to access DynamoDB User Table
+    userTable.grantReadWriteData(userCrudLambdaRole);
+
+    // Lambda function for User CRUD operations
+    const userCrudLambda = new lambda.Function(this, "UserCrudLambda", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      architecture: lambdaArchitecture,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset("lambda/user-crud"),
+      role: userCrudLambdaRole,
+      timeout: cdk.Duration.seconds(30),
+      memorySize: 256,
+      environment: {
+        USER_TABLE_NAME: userTable.tableName,
+      },
+      description: "CRUD operations for User Information DynamoDB table",
+    });
+
+    // ========================================
     // REST API Gateway with Response Streaming
     // ========================================
 
@@ -744,6 +778,7 @@ export class MuseumChatbot extends cdk.Stack {
       memorySize: 256,
       environment: {
         CONVERSATION_HISTORY_TABLE: conversationHistoryTable.tableName,
+        USER_TABLE_NAME: userTable.tableName,
         DATE_INDEX: "date-timestamp-index",
         FEEDBACK_INDEX: "feedback-timestamp-index",
       },
@@ -755,6 +790,9 @@ export class MuseumChatbot extends cdk.Stack {
     
     // Grant write access for feedback updates
     conversationHistoryTable.grantWriteData(adminApiLambda);
+
+    // Grant read access to user table for admin dashboard
+    userTable.grantReadData(adminApiLambda);
 
     // ========================================
     // Feedback Endpoint (uses Admin API Lambda - no streaming)
@@ -856,9 +894,59 @@ export class MuseumChatbot extends cdk.Stack {
     // Add environment variables to the Amplify branch for the frontend
     mainBranch.addEnvironment("NEXT_PUBLIC_CHAT_API_URL", `${api.url}chat`);
     mainBranch.addEnvironment("NEXT_PUBLIC_ADMIN_API_URL", `${api.url}admin`);
+    mainBranch.addEnvironment("NEXT_PUBLIC_USERS_API_URL", `${api.url}users`);
     mainBranch.addEnvironment("NEXT_PUBLIC_COGNITO_USER_POOL_ID", adminUserPool.userPoolId);
     mainBranch.addEnvironment("NEXT_PUBLIC_COGNITO_CLIENT_ID", adminAppClient.userPoolClientId);
     mainBranch.addEnvironment("NEXT_PUBLIC_AWS_REGION", aws_region);
+
+    // ========================================
+    // User Registration API (Public - POST only)
+    // ========================================
+
+    // Create /users resource (public endpoint for user self-registration)
+    const usersResource = api.root.addResource("users");
+
+    // Lambda integration for user CRUD operations
+    const userCrudIntegration = new apigateway.LambdaIntegration(userCrudLambda, {
+      proxy: true,
+    });
+
+    // POST /users - Create user (public, no auth required)
+    usersResource.addMethod("POST", userCrudIntegration);
+
+    // ========================================
+    // Admin User Management API (Protected - Cognito Auth)
+    // ========================================
+
+    // Create /admin/users resource under existing /admin
+    const adminUsersResource = adminResource.addResource("users");
+
+    // GET /admin/users - List all users (protected) - uses admin-api Lambda
+    adminUsersResource.addMethod("GET", adminIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+
+    // Create /admin/users/{userId} resource
+    const adminUserByIdResource = adminUsersResource.addResource("{userId}");
+
+    // GET /admin/users/{userId} - Get single user (protected)
+    adminUserByIdResource.addMethod("GET", userCrudIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+
+    // PUT /admin/users/{userId} - Update user (protected)
+    adminUserByIdResource.addMethod("PUT", userCrudIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
+
+    // DELETE /admin/users/{userId} - Delete user (protected)
+    adminUserByIdResource.addMethod("DELETE", userCrudIntegration, {
+      authorizer: adminAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    });
 
     // ========================================
     // Outputs
@@ -934,6 +1022,21 @@ export class MuseumChatbot extends cdk.Stack {
     new cdk.CfnOutput(this, "AmplifyAppUrl", {
       value: `https://main.${amplifyApp.defaultDomain}`,
       description: "Amplify hosted frontend URL",
+    });
+
+    new cdk.CfnOutput(this, "UserCrudLambdaArn", {
+      value: userCrudLambda.functionArn,
+      description: "Lambda function ARN for User CRUD operations",
+    });
+
+    new cdk.CfnOutput(this, "UserRegistrationApiUrl", {
+      value: `${api.url}users`,
+      description: "API Gateway URL for public user registration (POST /users only)",
+    });
+
+    new cdk.CfnOutput(this, "AdminUsersApiUrl", {
+      value: `${api.url}admin/users`,
+      description: "API Gateway URL for admin user management (GET, PUT, DELETE - requires Cognito auth)",
     });
   }
 }

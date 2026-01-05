@@ -21,6 +21,7 @@ from boto3.dynamodb.conditions import Key, Attr
 # Initialize DynamoDB
 dynamodb = boto3.resource("dynamodb")
 CONVERSATION_HISTORY_TABLE = os.environ.get("CONVERSATION_HISTORY_TABLE")
+USER_TABLE_NAME = os.environ.get("USER_TABLE_NAME")
 
 # GSI names from environment variables
 DATE_INDEX = os.environ.get("DATE_INDEX", "date-timestamp-index")
@@ -698,6 +699,79 @@ def get_feedback_summary(event: dict) -> dict:
     return json_response(200, response_data)
 
 
+def get_users(event: dict) -> dict:
+    """
+    Get list of users with pagination.
+    Uses Scan operation since we need to list all users.
+    
+    Query Parameters:
+    - limit: Number of records per page (default: 20, max: 100)
+    - offset: Number of records to skip (default: 0)
+    """
+    if not USER_TABLE_NAME:
+        return json_response(500, {"error": "USER_TABLE_NAME not configured"})
+    
+    table = dynamodb.Table(USER_TABLE_NAME)
+    
+    params = event.get("queryStringParameters") or {}
+    limit = min(int(params.get("limit", 20)), 100)  # Cap at 100
+    offset = int(params.get("offset", 0))
+    
+    # We need to scan the entire table to get total count and apply offset
+    # For better performance with large datasets, consider adding a GSI
+    all_items = []
+    
+    # Projection to only fetch needed fields
+    projection = "userId, createdAt, firstName, lastName, email, phoneNumber, supportQuestion"
+    
+    try:
+        response = table.scan(
+            ProjectionExpression=projection,
+        )
+        all_items.extend(response.get("Items", []))
+        
+        # Handle pagination for large tables
+        while "LastEvaluatedKey" in response:
+            response = table.scan(
+                ProjectionExpression=projection,
+                ExclusiveStartKey=response["LastEvaluatedKey"],
+            )
+            all_items.extend(response.get("Items", []))
+        
+        # Sort by createdAt descending (most recent first)
+        all_items.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
+        
+        # Apply pagination
+        total = len(all_items)
+        paginated_items = all_items[offset:offset + limit]
+        has_more = (offset + limit) < total
+        
+        # Format users for response
+        users = []
+        for item in paginated_items:
+            users.append({
+                "id": item.get("userId"),
+                "firstName": item.get("firstName", ""),
+                "lastName": item.get("lastName", ""),
+                "email": item.get("email", ""),
+                "phoneNumber": item.get("phoneNumber"),
+                "supportQuestion": item.get("supportQuestion", ""),
+                "createdAt": item.get("createdAt"),
+            })
+        
+        return json_response(200, {
+            "users": users,
+            "total": total,
+            "offset": offset,
+            "limit": limit,
+            "hasMore": has_more,
+        })
+        
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        return json_response(500, {"error": f"Failed to fetch users: {str(e)}"})
+
+
 def handler(event, context):
     """Main Lambda handler - routes requests to appropriate functions."""
     
@@ -719,6 +793,8 @@ def handler(event, context):
             return get_stats(event)
         elif "/admin/feedback-summary" in path:
             return get_feedback_summary(event)
+        elif "/admin/users" in path:
+            return get_users(event)
         elif "/admin/conversations/" in path:
             return get_conversation_by_id(event)
         elif "/admin/conversations" in path:

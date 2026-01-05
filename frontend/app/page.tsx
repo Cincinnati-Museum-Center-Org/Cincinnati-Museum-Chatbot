@@ -4,12 +4,13 @@ import { useState, useRef, useEffect, FormEvent, useMemo } from 'react';
 import { useLanguage } from './context/LanguageContext';
 import { getApiConfig } from './config/i18n';
 import Image from 'next/image';
-import { MapPin, Clock, Ticket, BookOpen, Users, Heart, Send } from 'lucide-react';
+import { MapPin, Clock, Ticket, BookOpen, Users, Heart, Send, Mail } from 'lucide-react';
 
 // Import modular components
 import {
   MarkdownContent,
   CitationsDisplay,
+  SupportModal,
   type Message,
   type Citation,
 } from './components';
@@ -22,6 +23,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const [pendingLanguage, setPendingLanguage] = useState<'en' | 'es' | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -269,28 +271,40 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Language Toggle */}
-        <div className="flex items-center gap-1 bg-white/20 rounded-full p-1">
+        <div className="flex items-center gap-3">
+          {/* Support Button */}
           <button
-            onClick={() => handleLanguageChange('en')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-              language === 'en'
-                ? 'bg-white text-[var(--text-primary)] shadow-sm'
-                : 'text-white hover:bg-white/10'
-            }`}
+            onClick={() => setShowSupportModal(true)}
+            className="flex items-center justify-center w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+            aria-label="Contact Support"
+            title="Contact Support"
           >
-            {t.english}
+            <Mail size={20} className="text-white" />
           </button>
-          <button
-            onClick={() => handleLanguageChange('es')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-              language === 'es'
-                ? 'bg-white text-[var(--text-primary)] shadow-sm'
-                : 'text-white hover:bg-white/10'
-            }`}
-          >
-            {t.spanish}
-          </button>
+
+          {/* Language Toggle */}
+          <div className="flex items-center gap-1 bg-white/20 rounded-full p-1">
+            <button
+              onClick={() => handleLanguageChange('en')}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                language === 'en'
+                  ? 'bg-white text-[var(--text-primary)] shadow-sm'
+                  : 'text-white hover:bg-white/10'
+              }`}
+            >
+              {t.english}
+            </button>
+            <button
+              onClick={() => handleLanguageChange('es')}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                language === 'es'
+                  ? 'bg-white text-[var(--text-primary)] shadow-sm'
+                  : 'text-white hover:bg-white/10'
+              }`}
+            >
+              {t.spanish}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -437,6 +451,12 @@ export default function Home() {
         }
         confirmText={language === 'en' ? 'Continue' : 'Continuar'}
         cancelText={language === 'en' ? 'Cancel' : 'Cancelar'}
+      />
+
+      {/* Support Modal */}
+      <SupportModal
+        isOpen={showSupportModal}
+        onClose={() => setShowSupportModal(false)}
       />
     </div>
   );
