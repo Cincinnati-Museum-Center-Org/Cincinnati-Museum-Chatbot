@@ -28,6 +28,18 @@ const AWS_REGION = process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1';
 // Cognito Auth API URL
 const COGNITO_URL = `https://cognito-idp.${AWS_REGION}.amazonaws.com/`;
 
+// Helper to decode JWT and check expiration
+const isTokenExpired = (token: string): boolean => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const exp = payload.exp * 1000; // Convert to milliseconds
+    // Add 60 second buffer to avoid edge cases
+    return Date.now() >= exp - 60000;
+  } catch {
+    return true; // If we can't decode, assume expired
+  }
+};
+
 interface AdminAuthProviderProps {
   children: ReactNode;
 }
@@ -44,8 +56,14 @@ export function AdminAuthProvider({ children }: AdminAuthProviderProps) {
     if (storedUser) {
       try {
         const parsed = JSON.parse(storedUser);
-        // TODO: Validate token expiration
-        setUser(parsed);
+        // Validate token expiration
+        if (parsed.idToken && !isTokenExpired(parsed.idToken)) {
+          setUser(parsed);
+        } else {
+          // Token expired, clear storage
+          console.log('Stored token expired, clearing session');
+          localStorage.removeItem('adminUser');
+        }
       } catch {
         localStorage.removeItem('adminUser');
       }
