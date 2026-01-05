@@ -12,7 +12,7 @@ interface UsersTabProps {
   pageSize: number;
   timezone: string;
   onPageChange: (page: number) => void;
-  onDeleteUser: (userId: string) => Promise<void>;
+  onDeleteUser: (userId: string, createdAt: string) => Promise<void>;
 }
 
 export function UsersTab({
@@ -30,12 +30,10 @@ export function UsersTab({
   const endIndex = Math.min(currentPage * pageSize, totalUsers);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
-  const handleDelete = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this support request?')) return;
-    
+  const handleDelete = async (userId: string, createdAt: string) => {
     setDeletingUserId(userId);
     try {
-      await onDeleteUser(userId);
+      await onDeleteUser(userId, createdAt);
     } finally {
       setDeletingUserId(null);
     }
@@ -142,7 +140,7 @@ export function UsersTab({
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => handleDelete(user.id)}
+                      onClick={() => handleDelete(user.id, user.createdAt)}
                       disabled={deletingUserId === user.id}
                       className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                       title="Delete request"

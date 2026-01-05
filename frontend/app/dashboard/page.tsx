@@ -229,7 +229,7 @@ export default function DashboardPage() {
 
   // Delete user
   const deleteUser = useCallback(
-    async (userId: string) => {
+    async (userId: string, createdAt: string) => {
       if (!user?.idToken) return;
 
       const headers = {
@@ -240,6 +240,7 @@ export default function DashboardPage() {
       const res = await fetch(`${ADMIN_API_URL}/users/${userId}`, {
         method: 'DELETE',
         headers,
+        body: JSON.stringify({ createdAt }),
       });
 
       if (res.status === 401 || res.status === 403) {
@@ -250,10 +251,11 @@ export default function DashboardPage() {
         throw new Error('Failed to delete user');
       }
 
-      // Refresh users list after deletion
-      await fetchUsers(usersPage);
+      // Remove user from local state immediately
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      setTotalUsers(prev => prev - 1);
     },
-    [user?.idToken, fetchUsers, usersPage]
+    [user?.idToken]
   );
 
   // Fetch all data
