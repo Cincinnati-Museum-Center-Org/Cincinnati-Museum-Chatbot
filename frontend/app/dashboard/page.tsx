@@ -230,7 +230,13 @@ export default function DashboardPage() {
   // Delete user
   const deleteUser = useCallback(
     async (userId: string, createdAt: string) => {
-      if (!user?.idToken) return;
+      if (!user?.idToken) {
+        throw new Error('Not authenticated');
+      }
+
+      if (!createdAt) {
+        throw new Error('Missing createdAt timestamp');
+      }
 
       const headers = {
         Authorization: user.idToken,
@@ -248,7 +254,8 @@ export default function DashboardPage() {
       }
 
       if (!res.ok) {
-        throw new Error('Failed to delete user');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to delete user');
       }
 
       // Remove user from local state immediately

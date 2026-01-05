@@ -29,11 +29,22 @@ export function UsersTab({
   const startIndex = (currentPage - 1) * pageSize + 1;
   const endIndex = Math.min(currentPage * pageSize, totalUsers);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDelete = async (userId: string, createdAt: string) => {
+    if (!createdAt) {
+      setDeleteError('Cannot delete: missing creation date');
+      return;
+    }
+    
     setDeletingUserId(userId);
+    setDeleteError(null);
+    
     try {
       await onDeleteUser(userId, createdAt);
+    } catch (error) {
+      console.error('Delete failed:', error);
+      setDeleteError('Failed to delete. Please try again.');
     } finally {
       setDeletingUserId(null);
     }
@@ -51,6 +62,13 @@ export function UsersTab({
           {totalUsers > 0 ? `Showing ${startIndex}-${endIndex} of ${totalUsers} requests` : 'No support requests found'}
         </span>
       </div>
+
+      {/* Error Message */}
+      {deleteError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
+          {deleteError}
+        </div>
+      )}
 
       {/* Users List */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
