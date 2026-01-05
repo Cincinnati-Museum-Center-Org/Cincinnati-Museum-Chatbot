@@ -114,8 +114,13 @@ For developers looking to extend or customize this project, see [docs/modificati
 
 This application was developed by:
 
+**Associate Cloud Developers:**
 - <a href="https://www.linkedin.com/in/aryankhanna2004/" target="_blank">Aryan Khanna</a>
 - <a href="https://www.linkedin.com/in/sreeram-sreedhar/" target="_blank">Sreeram Sreedhar</a>
+
+**UI/UX Designers:**
+- <a href="https://www.linkedin.com/in/jennnyen/" target="_blank">Jenny Nguyen</a>
+- <a href="https://www.linkedin.com/in/pshristi/" target="_blank">Shristi Pathak</a>
 
 Built in collaboration with the ASU Cloud Innovation Center and Cincinnati Museum Center.
 
