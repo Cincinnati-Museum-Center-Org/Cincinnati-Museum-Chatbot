@@ -1,7 +1,8 @@
 'use client';
 
-import { ChevronLeft, ChevronRight, Loader2, Users, Mail, Phone, HelpCircle } from 'lucide-react';
-import { User } from '../types';
+import { useState } from 'react';
+import { ChevronLeft, ChevronRight, Loader2, Users, Mail, Phone, HelpCircle, Calendar, Trash2 } from 'lucide-react';
+import { User, formatInTimezone } from '../types';
 
 interface UsersTabProps {
   users: User[];
@@ -9,7 +10,9 @@ interface UsersTabProps {
   currentPage: number;
   totalUsers: number;
   pageSize: number;
+  timezone: string;
   onPageChange: (page: number) => void;
+  onDeleteUser: (userId: string) => Promise<void>;
 }
 
 export function UsersTab({
@@ -18,11 +21,25 @@ export function UsersTab({
   currentPage,
   totalUsers,
   pageSize,
+  timezone,
   onPageChange,
+  onDeleteUser,
 }: UsersTabProps) {
   const totalPages = Math.ceil(totalUsers / pageSize);
   const startIndex = (currentPage - 1) * pageSize + 1;
   const endIndex = Math.min(currentPage * pageSize, totalUsers);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+
+  const handleDelete = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this support request?')) return;
+    
+    setDeletingUserId(userId);
+    try {
+      await onDeleteUser(userId);
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -30,10 +47,10 @@ export function UsersTab({
       <div className="bg-white rounded-xl p-4 border border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Users className="w-5 h-5 text-[#4B7BF5]" />
-          <h3 className="font-medium text-slate-800">User Directory</h3>
+          <h3 className="font-medium text-slate-800">Support Directory</h3>
         </div>
         <span className="text-sm text-slate-500">
-          {totalUsers > 0 ? `Showing ${startIndex}-${endIndex} of ${totalUsers} users` : 'No users found'}
+          {totalUsers > 0 ? `Showing ${startIndex}-${endIndex} of ${totalUsers} requests` : 'No support requests found'}
         </span>
       </div>
 
@@ -61,8 +78,17 @@ export function UsersTab({
                 <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">
                   <div className="flex items-center gap-1.5">
                     <HelpCircle className="w-4 h-4" />
-                    Support Question
+                    Question
                   </div>
+                </th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4" />
+                    Date Submitted
+                  </div>
+                </th>
+                <th className="text-right px-4 py-3 text-sm font-medium text-slate-600">
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -111,6 +137,23 @@ export function UsersTab({
                       {user.supportQuestion}
                     </p>
                   </td>
+                  <td className="px-4 py-3 text-sm text-slate-600">
+                    {user.createdAt ? formatInTimezone(user.createdAt, timezone) : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => handleDelete(user.id)}
+                      disabled={deletingUserId === user.id}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Delete request"
+                    >
+                      {deletingUserId === user.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -120,7 +163,7 @@ export function UsersTab({
         {users.length === 0 && !isLoading && (
           <div className="p-8 text-center text-slate-500">
             <Users className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-            <p>No users found</p>
+            <p>No support requests found</p>
           </div>
         )}
 

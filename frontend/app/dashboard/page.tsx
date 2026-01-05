@@ -227,6 +227,35 @@ export default function DashboardPage() {
     [user?.idToken]
   );
 
+  // Delete user
+  const deleteUser = useCallback(
+    async (userId: string) => {
+      if (!user?.idToken) return;
+
+      const headers = {
+        Authorization: user.idToken,
+        'Content-Type': 'application/json',
+      };
+
+      const res = await fetch(`${ADMIN_API_URL}/users/${userId}`, {
+        method: 'DELETE',
+        headers,
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(SESSION_EXPIRED_ERROR);
+      }
+
+      if (!res.ok) {
+        throw new Error('Failed to delete user');
+      }
+
+      // Refresh users list after deletion
+      await fetchUsers(usersPage);
+    },
+    [user?.idToken, fetchUsers, usersPage]
+  );
+
   // Fetch all data
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -463,7 +492,7 @@ export default function DashboardPage() {
                     : 'border-transparent text-slate-600 hover:text-slate-900'
                 }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'users' ? 'Support' : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </div>
@@ -572,7 +601,9 @@ export default function DashboardPage() {
             currentPage={usersPage}
             totalUsers={totalUsers}
             pageSize={USERS_PAGE_SIZE}
+            timezone={timezone}
             onPageChange={handleUsersPageChange}
+            onDeleteUser={deleteUser}
           />
         )}
       </main>

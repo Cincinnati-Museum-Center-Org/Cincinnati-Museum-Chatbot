@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { X, Mail, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Loader2, CheckCircle, AlertCircle, HelpCircle } from 'lucide-react';
 
 interface SupportModalProps {
   isOpen: boolean;
@@ -118,6 +118,17 @@ export function SupportModal({ isOpen, onClose }: SupportModalProps) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Form Header */}
+              <div className="text-center mb-2">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-[#4B7BF5]/10 rounded-full mb-3">
+                  <HelpCircle className="w-6 h-6 text-[#4B7BF5]" />
+                </div>
+                <h2 className="text-xl font-semibold text-slate-800 mb-1">Contact Support</h2>
+                <p className="text-sm text-slate-600">
+                  Have a question our chatbot couldn&apos;t answer? Fill out this form and our team will get back to you.
+                </p>
+              </div>
+
               {/* First Name */}
               <div>
                 <label htmlFor="firstName" className="block text-sm font-semibold text-slate-800 mb-1.5">
