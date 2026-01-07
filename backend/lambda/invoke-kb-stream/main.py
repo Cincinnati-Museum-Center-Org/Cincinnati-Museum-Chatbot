@@ -141,6 +141,11 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
     conversation_id = str(uuid.uuid4())
     start_time = time.time()
     
+    print(f"[{conversation_id}] New query: '{query[:100]}...' | language={language} | session={session_id}")
+    
+    # Model for implicit filtering - using Claude 3.5 Sonnet for better filter generation
+    IMPLICIT_FILTER_MODEL = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
+    
     # Build knowledge base configuration
     kb_config = {
         "knowledgeBaseId": KNOWLEDGE_BASE_ID,
@@ -149,7 +154,18 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
             "vectorSearchConfiguration": {
                 "numberOfResults": number_of_results,
                 # Use hybrid search (semantic + text) for better accuracy
-                "overrideSearchType": "HYBRID"
+                "overrideSearchType": "HYBRID",
+                # Implicit metadata filtering - model auto-generates filters based on query
+                "implicitFilterConfiguration": {
+                    "modelArn": IMPLICIT_FILTER_MODEL,
+                    "metadataAttributes": [
+                        {
+                            "key": "x-amz-bedrock-kb-source-uri",
+                            "type": "STRING",
+                            "description": "The source URL of the content. URLs containing 'event-processing' are for live events, upcoming programs, and current happenings at the Cincinnati Museum Center."
+                        }
+                    ]
+                }
             }
         },
         # Enable query decomposition for complex queries
@@ -160,17 +176,44 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
         }
     }
     
-    # For Spanish: use generationConfiguration.promptTemplate to instruct the model
-    # This keeps the user's query clean while adding system-level instructions
+    # Generation prompt templates with time context
     # NOTE: $output_format_instructions$ is REQUIRED for citations to be displayed
+    # NOTE: $search_results$ contains the retrieved documents
+    # NOTE: $current_time$ is automatically replaced by Bedrock with the current timestamp
+    
     if language == "es":
+        # Spanish generation prompt
         kb_config["generationConfiguration"] = {
             "promptTemplate": {
-                "textPromptTemplate": """Eres un agente de respuesta a preguntas. Te proporcionaré un conjunto de resultados de búsqueda. El usuario te hará una pregunta. Tu trabajo es responder la pregunta del usuario usando SOLO información de los resultados de búsqueda. Si los resultados de búsqueda no contienen información que pueda responder la pregunta, indica que no pudiste encontrar una respuesta exacta.
-
+                "textPromptTemplate": """
+Eres un agente de respuesta a preguntas. Te proporcionaré un conjunto de resultados de búsqueda. El usuario te hará una pregunta. Tu trabajo es responder la pregunta del usuario usando SOLO información de los resultados de búsqueda. Si los resultados de búsqueda no contienen información que pueda responder la pregunta, responde exactamente:
+"Has hecho una excelente pregunta, pero es algo para lo que aún no tengo los detalles. Para obtener la información más precisa, comunícate con nuestro equipo al (513) 287-7000."
 IMPORTANTE: DEBES responder ÚNICAMENTE en español. No uses inglés bajo ninguna circunstancia.
+FECHA Y HORA ACTUAL: $current_time$
+
+Para saludos generales (hola, buenos días, etc.) responde de manera amigable y ofrece ayuda con información sobre el museo.
 
 Aquí están los resultados de búsqueda en orden numerado:
+$search_results$
+
+$output_format_instructions$"""
+            }
+        }
+    else:
+        # English generation prompt (default)
+        kb_config["generationConfiguration"] = {
+            "promptTemplate": {
+                "textPromptTemplate": """You are a virtual assistant for the Cincinnati Museum Center (CMC). Your role is to help visitors by answering questions about the museum, its exhibitions, events, schedules, and services.
+
+CURRENT DATE AND TIME: $current_time$
+
+INSTRUCTIONS:
+- For general greetings (hello, hi, hey, etc.) respond in a friendly manner and offer to help with museum information.
+- Use information from the provided search results to answer questions about the museum.
+- If the search results don't contain enough information to answer a specific museum-related question, respond exactly: "You've asked a great question, but it's one I don't have the details for just yet. For the most accurate information, please contact our team at (513) 287-7000."
+- When asked about events or what's happening, share upcoming events from the search results even if they are in the future. Indicate the dates clearly.
+
+Search results:
 $search_results$
 
 $output_format_instructions$"""
@@ -252,6 +295,8 @@ $output_format_instructions$"""
         # Calculate response time
         response_time_ms = int((time.time() - start_time) * 1000)
         
+        print(f"[{conversation_id}] Response complete | {response_time_ms}ms | {len(all_citations)} citations | {len(full_response_text)} chars")
+        
         # After all text is streamed, send metadata
         if all_citations:
             yield f"event: citations\ndata: {json.dumps({'citations': all_citations})}\n\n"
@@ -275,7 +320,7 @@ $output_format_instructions$"""
         
     except Exception as e:
         error_msg = str(e)
-        print(f"Error streaming from Bedrock: {error_msg}")
+        print(f"[{conversation_id}] Error: {error_msg}")
         yield f"event: error\ndata: {json.dumps({'error': error_msg})}\n\n"
 
 
