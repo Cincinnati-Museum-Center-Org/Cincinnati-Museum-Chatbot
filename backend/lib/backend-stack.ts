@@ -448,7 +448,6 @@ export class MuseumChatbot extends cdk.Stack {
     // - Main website: cincymuseum.org
     // - Collections: searchcollections.cincymuseum.org
     // - Philanthropy: supportcmc.org
-    // - Event processing: cincymuseum.org/event-processing
     // - Podcast feed: feed.podbean.com/cincinnatimuseumcenter
     const webCrawlerDataSource = new bedrock.CfnDataSource(this, "MuseumWebCrawlerDataSource", {
       name: "MuseumWebsites-v2",
@@ -463,7 +462,6 @@ export class MuseumChatbot extends cdk.Stack {
                 { url: "https://www.cincymuseum.org/#gsc.tab=0" },
                 // { url: "https://searchcollections.cincymuseum.org" },
                 { url: "https://supportcmc.org/" },
-                { url: "https://www.cincymuseum.org/event-processing/filename.html" },
                 { url: "https://feed.podbean.com/cincinnatimuseumcenter/feed.xml" },
               ],
             },
@@ -497,6 +495,51 @@ export class MuseumChatbot extends cdk.Stack {
 
     // Ensure web crawler data source is created after knowledge base
     webCrawlerDataSource.addDependency(knowledgeBase);
+
+    // ========================================
+    // Data Source: Events (Separate for better filtering)
+    // ========================================
+    const eventsDataSource = new bedrock.CfnDataSource(this, "MuseumEventsDataSource", {
+      name: "MuseumEvents",
+      description: "Live events and upcoming programs at Cincinnati Museum Center",
+      knowledgeBaseId: knowledgeBase.attrKnowledgeBaseId,
+      dataSourceConfiguration: {
+        type: "WEB",
+        webConfiguration: {
+          sourceConfiguration: {
+            urlConfiguration: {
+              seedUrls: [
+                { url: "https://www.cincymuseum.org/event-processing/filename.html" },
+              ],
+            },
+          },
+          crawlerConfiguration: {
+            crawlerLimits: {
+              maxPages: 100, // Events page is smaller
+              rateLimit: 50,
+            },
+          },
+        },
+      },
+      vectorIngestionConfiguration: {
+        chunkingConfiguration: {
+          chunkingStrategy: "FIXED_SIZE",
+          fixedSizeChunkingConfiguration: {
+            maxTokens: 500, // Smaller chunks for individual events
+            overlapPercentage: 10,
+          },
+        },
+        parsingConfiguration: {
+          parsingStrategy: "BEDROCK_DATA_AUTOMATION",
+          bedrockDataAutomationConfiguration: {
+            parsingModality: "MULTIMODAL",
+          },
+        },
+      },
+    });
+
+    // Ensure events data source is created after knowledge base
+    eventsDataSource.addDependency(knowledgeBase);
 
     // ========================================
     // Lambda Function: Invoke Knowledge Base
