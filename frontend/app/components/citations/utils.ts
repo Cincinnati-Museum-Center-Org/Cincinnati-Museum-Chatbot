@@ -1,6 +1,50 @@
 import type { Citation, MediaSource, WebSource, ParsedCitations } from './types';
 
 /**
+ * Extract a clean, readable title from a URL.
+ * Handles common patterns like event-processing, paths with slugs, etc.
+ */
+function extractTitleFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.replace('www.', '');
+    const pathname = urlObj.pathname;
+    
+    // Map known domains to friendly names
+    const domainNames: Record<string, string> = {
+      'cincymuseum.org': 'Cincinnati Museum Center',
+      'supportcmc.org': 'Support CMC',
+      'feed.podbean.com': 'CMC Podcast',
+    };
+    
+    // Check for specific path patterns
+    if (pathname.includes('event-processing')) {
+      return 'Museum Events';
+    }
+    
+    // Get the last meaningful path segment
+    const pathParts = pathname.split('/').filter(p => p && p !== 'filename.html');
+    if (pathParts.length > 0) {
+      const lastPart = pathParts[pathParts.length - 1];
+      // Clean up the path segment: remove extensions, replace dashes/underscores
+      const cleanTitle = lastPart
+        .replace(/\.(html|htm|php|aspx?)$/i, '')
+        .replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase()); // Title case
+      
+      if (cleanTitle.length > 3) {
+        return cleanTitle;
+      }
+    }
+    
+    // Fall back to domain name
+    return domainNames[hostname] || hostname;
+  } catch {
+    return 'Source';
+  }
+}
+
+/**
  * Parse citations and extract media sources, web links, and PDF sources.
  * Handles deduplication and title extraction.
  */
@@ -93,7 +137,14 @@ export function parseCitations(citations: Citation[]): ParsedCitations {
 
           pdfSources.push({ url: location.url, title: pdfTitle });
         } else {
-          const title = metadataTitle || ref.content?.text?.substring(0, 50) || 'Source';
+          // Extract a clean title for web links
+          let title = metadataTitle;
+          
+          if (!title) {
+            // Try to get a clean title from the URL path
+            title = extractTitleFromUrl(location.url);
+          }
+          
           webLinks.push({ url: location.url, title });
         }
       }
