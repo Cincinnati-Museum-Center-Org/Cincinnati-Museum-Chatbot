@@ -1,7 +1,9 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import { Filter, ThumbsDown, ChevronRight, Loader2, X, Calendar } from 'lucide-react';
 import { Conversation, FeedbackSummary, formatInTimezone } from '../types';
+import { ConversationDetailModal, ConversationDetail } from './ConversationDetailModal';
 
 interface ConversationsTabProps {
   conversations: Conversation[];
@@ -15,7 +17,10 @@ interface ConversationsTabProps {
   onDateFilterClear: () => void;
   onApplyFilter: () => void;
   onLoadMore: () => void;
+  userToken?: string;
 }
+
+const ADMIN_API_URL = process.env.NEXT_PUBLIC_ADMIN_API_URL || '';
 
 export function ConversationsTab({
   conversations,
@@ -29,7 +34,12 @@ export function ConversationsTab({
   onDateFilterClear,
   onApplyFilter,
   onLoadMore,
+  userToken,
 }: ConversationsTabProps) {
+  const [selectedConversation, setSelectedConversation] = useState<ConversationDetail | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+
   // Format date for display
   const formatDateDisplay = (date: string) => {
     const d = new Date(date + 'T00:00:00');
@@ -39,6 +49,51 @@ export function ConversationsTab({
       day: 'numeric',
       year: 'numeric',
     });
+  };
+
+  // Fetch full conversation details
+  const fetchConversationDetail = useCallback(
+    async (conversationId: string) => {
+      if (!userToken) {
+        console.error('No user token available');
+        return;
+      }
+
+      setIsLoadingDetail(true);
+      try {
+        const response = await fetch(`${ADMIN_API_URL}/conversations/${conversationId}`, {
+          headers: {
+            Authorization: userToken,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch conversation details');
+        }
+
+        const data = await response.json();
+        setSelectedConversation(data);
+        setIsModalOpen(true);
+      } catch (error) {
+        console.error('Error fetching conversation detail:', error);
+        alert('Failed to load conversation details. Please try again.');
+      } finally {
+        setIsLoadingDetail(false);
+      }
+    },
+    [userToken]
+  );
+
+  // Handle conversation row click
+  const handleConversationClick = (conversationId: string) => {
+    fetchConversationDetail(conversationId);
+  };
+
+  // Close modal
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedConversation(null);
   };
 
   return (
@@ -136,7 +191,8 @@ export function ConversationsTab({
               {conversations.map((conv) => (
                 <tr
                   key={conv.conversationId}
-                  className={`border-b border-slate-100 hover:bg-slate-50 ${
+                  onClick={() => handleConversationClick(conv.conversationId)}
+                  className={`border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors ${
                     conv.feedback === 'neg' ? 'bg-orange-50/50' : ''
                   }`}
                 >
@@ -204,6 +260,24 @@ export function ConversationsTab({
             )}
             Load More
           </button>
+        </div>
+      )}
+
+      {/* Conversation Detail Modal */}
+      <ConversationDetailModal
+        conversation={selectedConversation}
+        timezone={timezone}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+      />
+
+      {/* Loading overlay for detail fetch */}
+      {isLoadingDetail && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20">
+          <div className="bg-white rounded-lg p-6 shadow-xl flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-[#4B7BF5]" />
+            <span className="text-slate-700">Loading conversation details...</span>
+          </div>
         </div>
       )}
     </div>

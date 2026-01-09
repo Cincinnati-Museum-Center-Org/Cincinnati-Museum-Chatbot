@@ -254,9 +254,9 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen bg-[var(--background)]">
       {/* Header */}
-      <header className="shrink-0 flex items-center justify-between px-6 py-4 bg-[var(--primary-blue)] text-white">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-12 h-12 bg-black rounded-lg overflow-hidden">
+      <header className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-[var(--primary-blue)] to-[var(--primary-blue-hover)] text-white shadow-md">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+          <div className="flex items-center justify-center w-12 h-12 bg-black rounded-lg overflow-hidden flex-shrink-0">
             <Image 
               src="/CMC_LOGO.svg" 
               alt="Cincinnati Museum Center Logo" 
@@ -265,41 +265,49 @@ export default function Home() {
               className="invert"
             />
           </div>
-          <div>
-            <h1 className="text-xl font-semibold">{t.brandName}</h1>
-            <p className="text-sm text-white/80">{t.brandTagline}</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl font-bold truncate">{t.brandName}</h1>
+            <p className="text-xs sm:text-sm text-white/90 truncate">{t.brandTagline}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           {/* Support Button */}
           <button
             onClick={() => setShowSupportModal(true)}
-            className="flex items-center justify-center w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+            className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 bg-white/15 hover:bg-white/25 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm border border-white/20"
             aria-label="Contact Support"
             title="Contact Support"
           >
-            <Mail size={20} className="text-white" />
+            <Mail size={18} className="sm:w-5 sm:h-5 text-white" />
           </button>
 
           {/* Language Toggle */}
-          <div className="flex items-center gap-1 bg-white/20 rounded-full p-1">
+          <div 
+            className="flex items-center gap-0.5 bg-white/15 backdrop-blur-sm rounded-full p-0.5 shadow-sm border border-white/20"
+            role="group"
+            aria-label="Language selector"
+          >
             <button
               onClick={() => handleLanguageChange('en')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              aria-label={`Switch to English${language === 'en' ? ' (current language)' : ''}`}
+              aria-pressed={language === 'en'}
+              className={`min-h-[36px] sm:min-h-[40px] px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[var(--primary-blue)] active:scale-95 ${
                 language === 'en'
-                  ? 'bg-white text-[var(--text-primary)] shadow-sm'
-                  : 'text-white hover:bg-white/10'
+                  ? 'bg-white text-[var(--text-primary)] shadow-md'
+                  : 'text-white hover:bg-white/15 active:bg-white/25'
               }`}
             >
               {t.english}
             </button>
             <button
               onClick={() => handleLanguageChange('es')}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              aria-label={`Switch to Spanish${language === 'es' ? ' (current language)' : ''}`}
+              aria-pressed={language === 'es'}
+              className={`min-h-[36px] sm:min-h-[40px] px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-[var(--primary-blue)] active:scale-95 ${
                 language === 'es'
-                  ? 'bg-white text-[var(--text-primary)] shadow-sm'
-                  : 'text-white hover:bg-white/10'
+                  ? 'bg-white text-[var(--text-primary)] shadow-md'
+                  : 'text-white hover:bg-white/15 active:bg-white/25'
               }`}
             >
               {t.spanish}

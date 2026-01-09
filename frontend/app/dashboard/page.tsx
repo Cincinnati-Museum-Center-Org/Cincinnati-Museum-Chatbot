@@ -600,6 +600,7 @@ export default function DashboardPage() {
             onDateFilterClear={handleDateFilterClear}
             onApplyFilter={handleFilterChange}
             onLoadMore={handleLoadMore}
+            userToken={user?.idToken}
           />
         )}
 

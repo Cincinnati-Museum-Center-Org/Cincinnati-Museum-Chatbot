@@ -6,3 +6,5 @@ export { ConversationsChart } from './ConversationsChart';
 export { SatisfactionPieChart } from './SatisfactionPieChart';
 export { ConversationsTab } from './ConversationsTab';
 export { UsersTab } from './UsersTab';
+export { ConversationDetailModal } from './ConversationDetailModal';
+export type { ConversationDetail } from './ConversationDetailModal';
