@@ -37,6 +37,8 @@ All `/admin/*` endpoints require a valid Cognito JWT token.
 
 Streaming chat interface powered by Amazon Bedrock Knowledge Base with Server-Sent Events (SSE).
 
+> **Note**: This endpoint uses Amazon API Gateway REST API response streaming capability. For more information, see the [AWS announcement](https://aws.amazon.com/about-aws/whats-new/2025/11/api-gateway-response-streaming-rest-apis/).
+
 ---
 
 #### POST /chat — Stream chat response from Knowledge Base

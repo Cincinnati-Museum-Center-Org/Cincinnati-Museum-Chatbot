@@ -37,7 +37,7 @@ All requests from the frontend are routed through **Amazon API Gateway**:
 
 - REST API with CORS support for cross-origin requests
 - Routes requests to appropriate Lambda functions
-- Supports response streaming for real-time chat
+- Supports response streaming for real-time chat (see [AWS announcement](https://aws.amazon.com/about-aws/whats-new/2025/11/api-gateway-response-streaming-rest-apis/))
 - Public endpoints for chat and feedback
 - Protected endpoints (Cognito auth) for admin APIs
 
@@ -139,7 +139,7 @@ Two DynamoDB tables store application data:
   - Automatic dependency management
 
 - **Amazon API Gateway**: REST API
-  - Response streaming support
+  - Response streaming support ([AWS announcement](https://aws.amazon.com/about-aws/whats-new/2025/11/api-gateway-response-streaming-rest-apis/))
   - CORS configuration
   - Cognito authorizer integration
 
