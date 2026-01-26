@@ -4,13 +4,9 @@ An intelligent AI-powered chatbot that helps visitors explore the Cincinnati Mus
 
 ## Demo Video
 
-<p align="center">
-  <video src="./docs/media/demo.mp4" width="640" controls>
-    Your browser does not support the video tag.
-  </video>
-</p>
 
-> **Note:** If the video doesn't play in your browser, you can [download it directly](./docs/media/demo.mp4).
+https://github.com/user-attachments/assets/eeccafcf-5ab7-43fb-8b9f-8cfbfc3b4456
+
 
 
 ## Index
