@@ -5,8 +5,12 @@ An intelligent AI-powered chatbot that helps visitors explore the Cincinnati Mus
 ## Demo Video
 
 <p align="center">
-  <img src="./docs/media/demo.mp4" alt="CincyMuse Demo" width="640" />
+  <video src="./docs/media/demo.mp4" width="640" controls>
+    Your browser does not support the video tag.
+  </video>
 </p>
+
+> **Note:** If the video doesn't play in your browser, you can [download it directly](./docs/media/demo.mp4).
 
 
 ## Index
