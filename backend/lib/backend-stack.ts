@@ -349,9 +349,10 @@ export class MuseumChatbot extends cdk.Stack {
     // ========================================
 
     // OLD ( FROM AWS ASU TEAM -> NEW BELOW HERE )-> Amazon Nova Multimodal Embeddings 1.0 model ARN
-    // const embeddingModelArn = `arn:aws:bedrock:${aws_region}::foundation-model/amazon.nova-2-multimodal-embeddings-v1:0`;
-    // ✅ Recommended: Amazon Titan Text Embeddings v2 for Knowledge Bases
-    const embeddingModelArn = `arn:aws:bedrock:${aws_region}::foundation-model/amazon.titan-embed-text-v2:0`;
+    // ✅ Titan Text Embeddings v2 (text-only, 1536 dims) was used for region/model testing
+    // const embeddingModelArn = `arn:aws:bedrock:${aws_region}::foundation-model/amazon.titan-embed-text-v2:0`;
+    // Reverting to Amazon Nova 2 Multimodal Embeddings (3072 dims, multimodal, us-east-1)
+    const embeddingModelArn = `arn:aws:bedrock:${aws_region}::foundation-model/amazon.nova-2-multimodal-embeddings-v1:0`;
 
 
     // Create the Knowledge Base with OpenSearch Serverless vector store
@@ -365,8 +366,8 @@ export class MuseumChatbot extends cdk.Stack {
           embeddingModelArn: embeddingModelArn,
           embeddingModelConfiguration: {
             bedrockEmbeddingModelConfiguration: {
-              // dimensions: 3072, // Amazon Nova Multimodal Embeddings 1.0 dimension
-              dimensions: 1536, // Amazon Titan Text Embeddings v2 dimension
+              dimensions: 3072, // Amazon Nova Multimodal Embeddings 1.0 dimension (multimodal, us-east-1)
+              // dimensions: 1536, // Amazon Titan Text Embeddings v2 dimension (text-only)
               embeddingDataType: "FLOAT32",
             },
           },
