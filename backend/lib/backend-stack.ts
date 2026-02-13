@@ -348,8 +348,11 @@ export class MuseumChatbot extends cdk.Stack {
     // Knowledge Base with OpenSearch Serverless
     // ========================================
 
-    // Amazon Nova Multimodal Embeddings 1.0 model ARN
-    const embeddingModelArn = `arn:aws:bedrock:${aws_region}::foundation-model/amazon.nova-2-multimodal-embeddings-v1:0`;
+    // OLD ( FROM AWS ASU TEAM -> NEW BELOW HERE )-> Amazon Nova Multimodal Embeddings 1.0 model ARN
+    // const embeddingModelArn = `arn:aws:bedrock:${aws_region}::foundation-model/amazon.nova-2-multimodal-embeddings-v1:0`;
+    // ✅ Recommended: Amazon Titan Text Embeddings v2 for Knowledge Bases
+    const embeddingModelArn = `arn:aws:bedrock:${aws_region}::foundation-model/amazon.titan-embed-text-v2:0`;
+
 
     // Create the Knowledge Base with OpenSearch Serverless vector store
     const knowledgeBase = new bedrock.CfnKnowledgeBase(this, "MuseumKnowledgeBase", {
