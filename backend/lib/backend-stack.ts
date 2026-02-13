@@ -365,7 +365,8 @@ export class MuseumChatbot extends cdk.Stack {
           embeddingModelArn: embeddingModelArn,
           embeddingModelConfiguration: {
             bedrockEmbeddingModelConfiguration: {
-              dimensions: 3072, // Amazon Nova Multimodal Embeddings 1.0 dimension
+              // dimensions: 3072, // Amazon Nova Multimodal Embeddings 1.0 dimension
+              dimensions: 1536, // Amazon Titan Text Embeddings v2 dimension
               embeddingDataType: "FLOAT32",
             },
           },
