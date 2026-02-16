@@ -241,35 +241,55 @@ $output_format_instructions$"""
     try:
         # Send conversation ID as first event (for feedback tracking)
         yield f"event: conversationId\ndata: {json.dumps({'conversationId': conversation_id})}\n\n"
-        
+
         # Call RetrieveAndGenerateStream API
-        try:
-            response = bedrock_agent_runtime.retrieve_and_generate_stream(**request_params)
-        except Exception as e:
-            error_msg = str(e)
-            # If session is invalid/expired, retry without session ID
-            if "Session with Id" in error_msg and "is not valid" in error_msg:
-                print(f"Session expired, retrying without session ID: {use_session_id}")
-                if "sessionId" in request_params:
-                    del request_params["sessionId"]
-                # Notify frontend to clear session
-                yield f"event: sessionExpired\ndata: {json.dumps({'message': 'Session expired, starting new session'})}\n\n"
+        max_retries = 3
+        backoff_base = 0.5  # seconds
+        response = None
+        for attempt in range(max_retries):
+            try:
                 response = bedrock_agent_runtime.retrieve_and_generate_stream(**request_params)
-            else:
-                raise
-        
+                break
+            except Exception as e:
+                error_msg = str(e)
+                # Handle throttling
+                if "ThrottlingException" in error_msg or "rate is too high" in error_msg:
+                    if attempt < max_retries - 1:
+                        sleep_time = backoff_base * (2 ** attempt)
+                        print(f"Throttling detected, retrying in {sleep_time:.2f}s (attempt {attempt+1}/{max_retries})")
+                        time.sleep(sleep_time)
+                        continue
+                    else:
+                        # Send error event to frontend
+                        yield f"event: error\ndata: {{\"error\": \"Bedrock API throttling: {error_msg}\"}}\n\n"
+                        response = None
+                        break
+                # If session is invalid/expired, retry without session ID
+                elif "Session with Id" in error_msg and "is not valid" in error_msg:
+                    print(f"Session expired, retrying without session ID: {use_session_id}")
+                    if "sessionId" in request_params:
+                        del request_params["sessionId"]
+                    # Notify frontend to clear session
+                    yield f"event: sessionExpired\ndata: {json.dumps({'message': 'Session expired, starting new session'})}\n\n"
+                    # Retry immediately (no backoff for session expired)
+                    continue
+                else:
+                    raise
+        if response is None:
+            raise RuntimeError("Failed to get response from Bedrock after retries.")
+
         # Get session ID from response
         response_session_id = response.get("sessionId")
-        
+
         # Send session ID
         if response_session_id:
             yield f"event: sessionId\ndata: {json.dumps({'sessionId': response_session_id})}\n\n"
-        
+
         # Collect full response for saving to DynamoDB
         full_response_text = ""
         all_citations = []
         guardrail_action = None
-        
+
         # Process streaming response - stream text immediately, collect metadata
         stream = response.get("stream")
         if stream:
@@ -281,29 +301,29 @@ $output_format_instructions$"""
                         text_chunk = output['text']
                         full_response_text += text_chunk
                         yield f"event: text\ndata: {json.dumps({'text': text_chunk})}\n\n"
-                
+
                 # Collect citation events for later
                 if "citation" in stream_event:
                     citation = stream_event["citation"]
                     formatted_citation = format_citation(citation)
                     all_citations.append(formatted_citation)
-                
+
                 # Collect guardrail event for later
                 if "guardrail" in stream_event:
                     guardrail_action = stream_event["guardrail"].get("action")
-        
+
         # Calculate response time
         response_time_ms = int((time.time() - start_time) * 1000)
-        
+
         print(f"[{conversation_id}] Response complete | {response_time_ms}ms | {len(all_citations)} citations | {len(full_response_text)} chars")
-        
+
         # After all text is streamed, send metadata
         if all_citations:
             yield f"event: citations\ndata: {json.dumps({'citations': all_citations})}\n\n"
-        
+
         if guardrail_action:
             yield f"event: guardrail\ndata: {json.dumps({'action': guardrail_action})}\n\n"
-        
+
         # Save conversation to DynamoDB (async, don't block response)
         save_conversation_to_dynamodb(
             conversation_id=conversation_id,
@@ -314,10 +334,10 @@ $output_format_instructions$"""
             response_time_ms=response_time_ms,
             language=language
         )
-        
+
         # Send done event with conversation ID and response time
         yield f"event: done\ndata: {json.dumps({'status': 'complete', 'conversationId': conversation_id, 'responseTimeMs': response_time_ms})}\n\n"
-        
+
     except Exception as e:
         error_msg = str(e)
         print(f"[{conversation_id}] Error: {error_msg}")
