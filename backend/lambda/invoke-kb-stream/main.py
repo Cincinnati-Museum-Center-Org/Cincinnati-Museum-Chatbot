@@ -143,8 +143,10 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
     
     print(f"[{conversation_id}] New query: '{query[:100]}...' | language={language} | session={session_id}")
     
-    # Model for implicit filtering - using Claude 3.5 Sonnet for better filter generation
-    IMPLICIT_FILTER_MODEL = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
+    # OLD - Model for implicit filtering - using Claude 3.5 Sonnet for better filter generation
+    # IMPLICIT_FILTER_MODEL = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
+    # NEW - Model to use because Claude 3.5 sonnet is deprecated
+    IMPLICIT_FILTER_MODEL = "us.anthropic.claude-sonnet-4-6"
     
     # Build knowledge base configuration
     kb_config = {
