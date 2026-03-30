@@ -630,6 +630,7 @@ export class MuseumChatbot extends cdk.Stack {
         AWS_LWA_INVOKE_MODE: "response_stream",
         PORT: "8000",
         CONVERSATION_HISTORY_TABLE: conversationHistoryTable.tableName,
+        IMPLICIT_FILTER_MODEL_ARN: `arn:aws:bedrock:us-east-1:${cdk.Stack.of(this).account}:inference-profile/us.anthropic.claude-sonnet-4-6`,
       },
       layers: [
         lambda.LayerVersion.fromLayerVersionArn(this, "LambdaWebAdapterLayer", lambdaWebAdapterLayerArn),

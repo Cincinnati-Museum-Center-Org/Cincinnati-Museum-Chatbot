@@ -37,6 +37,10 @@ dynamodb = boto3.resource("dynamodb")
 KNOWLEDGE_BASE_ID = os.environ.get("KNOWLEDGE_BASE_ID")
 AWS_REGION = os.environ.get("AWS_REGION")
 CONVERSATION_HISTORY_TABLE = os.environ.get("CONVERSATION_HISTORY_TABLE")
+IMPLICIT_FILTER_MODEL_ARN = os.environ.get(
+    "IMPLICIT_FILTER_MODEL_ARN",
+    "arn:aws:bedrock:us-east-1:836283961957:inference-profile/us.anthropic.claude-sonnet-4-6",
+)
 
 # Model ID for generation - using global inference profile
 MODEL_ID = "global.amazon.nova-2-lite-v1:0"
@@ -143,11 +147,6 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
     
     print(f"[{conversation_id}] New query: '{query[:100]}...' | language={language} | session={session_id}")
     
-    # OLD - Model for implicit filtering - using Claude 3.5 Sonnet for better filter generation
-    # IMPLICIT_FILTER_MODEL = "us.anthropic.claude-3-5-sonnet-20240620-v1:0"
-    # NEW - Model to use because Claude 3.5 sonnet is deprecated
-    IMPLICIT_FILTER_MODEL = "us.anthropic.claude-sonnet-4-6"
-    
     # Build knowledge base configuration
     kb_config = {
         "knowledgeBaseId": KNOWLEDGE_BASE_ID,
@@ -159,7 +158,7 @@ async def stream_kb_response(query: str, session_id: str = None, number_of_resul
                 "overrideSearchType": "HYBRID",
                 # Implicit metadata filtering - model auto-generates filters based on query
                 "implicitFilterConfiguration": {
-                    "modelArn": IMPLICIT_FILTER_MODEL,
+                    "modelArn": IMPLICIT_FILTER_MODEL_ARN,
                     "metadataAttributes": [
                         {
                             "key": "x-amz-bedrock-kb-source-uri",
